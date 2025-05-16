@@ -1,0 +1,271 @@
+/* Start Order CSS */
+.custom-quick-action-panel::part(header) {
+    text-align: left !important ;
+    color: #00256e !important;
+    font-weight: bold !important;
+    font-size: 1.2rem !important;
+}
+
+
+
+*{
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+.title_order{
+    font-size: 20px;
+    /* background-color: #f0f0f0; */
+}
+
+.main{
+    margin: 10px 0 ;
+}
+
+.main:first-of-type {
+    margin: 5px 0 !important;
+}
+
+.main_order {
+    font-size: 14px !important;
+}
+
+.btn_next{
+        display: flex;
+        gap: 12px; /* หรือใช้ margin ก็ได้ */
+        justify-content: flex-end; /* ถ้าต้องการให้ปุ่มไปชิดขวา */
+        margin-top: 1rem;
+    }
+
+.configure_button {
+    font-size: 16px;
+    /* margin-right: ; */
+}
+
+/* ::deep(.slds-checkbox) {
+    margin-right: 18px;
+} */
+
+.save {
+    --slds-c-button-brand-color-background: #066AFE;
+    --slds-c-button-brand-color-border: #066AFE;
+    --slds-c-button-brand-text-color: white;
+}
+
+.cancel {
+    margin-right: 8px;
+    --slds-c-button-brand-color-background: #f4f6f9;
+    --slds-c-button-brand-color-border: #5C5C5C;
+    --slds-c-button-brand-text-color: #066AFE;
+}
+
+.cancel:hover {
+    /* background-color: none; */
+    --slds-c-button-brand-color-background: none;
+}
+
+
+/* dropdown container */
+.dropdown.container_dropdown {
+    color: #083378;
+    position: absolute;
+    width: 100%;
+    max-height: 200px;
+    overflow-y: auto;
+    border: 1px solid #dcdcdc;
+    background-color: white;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    border-radius: 0.5rem;
+    z-index: 1000;
+}
+
+/* individual dropdown item */
+.dropdown-item.edit_dropdown {
+    padding: 0.5rem 3rem;
+    cursor: pointer;
+    font-size: 0.8rem;
+}
+
+/* last item no border */
+.edit_dropdown:last-child {
+    border-bottom: none;
+}
+
+
+.edit_dropdown:hover {
+    background-color: #d6e4f5;
+    /* color: #0070d2; */
+}
+
+
+.btnSubmit{
+    margin-left: 8px;
+    font-size: 14px;
+}
+
+.slds-form-element__control .slds-radio, .slds-form-element__control .slds-checkbox {
+    margin-bottom: 20px !important;
+}
+
+.slds-checkbox {
+    margin-bottom: 0.5rem;
+    border: 1px dashed red; /* debug เท่านั้น */
+}
+
+.Checkbox{
+    margin: 10px 0;
+}
+
+
+
+
+/* End Order CSS */
+
+
+  /* ##############################################################๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒ */
+
+
+
+/* Start Add Product */
+
+
+.main_product {
+    font-size: 14px !important;
+}
+
+.title_product{
+    font-size: 20px;
+}
+
+
+/* Start Section Search Product */
+
+.product {
+    /* padding:0 180px; */
+    margin-bottom: 30px;
+}
+
+.dropdown-list {   
+    color: #083378;
+    position: absolute;
+    width: 100%;
+    max-height: 200px;  
+    overflow-y: auto;
+    border: 1px solid #dcdcdc;
+    background-color: white;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    border-radius: 0.5rem;
+    z-index: 1000;
+}
+
+.dropdown-list li {
+    padding: 0.5rem 3rem;
+    cursor: pointer;
+    font-size: 0.8rem;
+}
+
+.dropdown-list li:last-child {
+    border-bottom: none;
+}
+
+.dropdown-list li:hover {
+    background-color: #d6e4f5;
+}
+
+
+
+/* End Section Search Product */
+
+
+
+/* Start Section Footer */
+
+.btnProduct {
+    margin-top: 30px;
+    font-size: 16px;
+    display: flex;
+    justify-content: end;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+/* End Section Footer */
+
+
+
+
+/* Start CSS Of Add On Free Goods */
+
+.error-message {
+    font-size: 0.85rem;
+    color: red;
+    margin-top: 4px;
+    display: block;
+}
+
+.slds-modal__container{
+    margin: auto;
+}
+
+.slds-modal__header{
+    background-color: #f5f5f5;
+    border-bottom: 1px solid #ddd;
+    padding: 1rem;
+    text-align: center;
+}
+
+.slds-text-heading_medium{
+    font-size: 14px;
+    color: #1a1a1a;
+}
+
+.slds-modal__content {
+    padding: 1.5rem;
+    height: 300px;
+  }
+
+.slds-modal__footer{
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    padding: 1rem;
+}
+
+
+/* End CSS Of Add On Free Goods */
+
+
+
+
+/* Start CSS Table */
+
+table {
+    border-radius: 5px ;
+    border: 2px solid #c9c9c9;
+    overflow-x: scroll;
+}
+
+th{ 
+    font-size: 14px;
+    border: 2px solid #c9c9c9;
+    text-align: center;
+    padding: 5px 0;
+}
+
+td {
+    border: 2px solid #c9c9c9;
+    padding: 5px 8px;
+}
+
+th , td {
+    font-size: 14px;
+}
+
+/* End CSS Table */
+
+
+/* End Add Product */
+
+
+/* ๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒ */
