@@ -2,6 +2,7 @@ import { LightningElement, track, wire } from 'lwc';
 import { loadScript, loadStyle } from 'lightning/platformResourceLoader';
 import datatables from '@salesforce/resourceUrl/datatables';
 import jquery from '@salesforce/resourceUrl/jquery';
+import { CloseActionScreenEvent } from 'lightning/actions';
 import fetchDataProductPriceBook from '@salesforce/apex/INID_OrderTest.fetchDataProductPriceBook';
 
 export default class InidAddProduct extends LightningElement {
@@ -208,5 +209,9 @@ export default class InidAddProduct extends LightningElement {
         this.selectedProducts[index].total = this.selectedProducts[index].salePrice * quantity;
 
         this.updateDataTable();
+    }
+
+    handleCancel() {
+        this.dispatchEvent(new CloseActionScreenEvent());
     }
 }

@@ -34,7 +34,7 @@
 .btn_next{
         display: flex;
         gap: 12px; /* หรือใช้ margin ก็ได้ */
-        justify-content: flex-end; /* ถ้าต้องการให้ปุ่มไปชิดขวา */
+        justify-content: end;/* ถ้าต้องการให้ปุ่มไปชิดขวา */
         margin-top: 1rem;
     }
 

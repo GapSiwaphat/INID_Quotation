@@ -1,5 +1,0 @@
-<aura:component implements="lightning:actionOverride,lightning:isUrlAddressable,force:hasRecordId,lightning:hasPageReference">
-    <div style="width: 90%; max-width: 1025px;" class="slds-align_absolute-center">
-        <c:INID_Quotation recordId="{!v.recordId}" />
-    </div>
-</aura:component>
