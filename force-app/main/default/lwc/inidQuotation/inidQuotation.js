@@ -68,7 +68,7 @@ export default class InidAddProduct extends LightningElement {
             const selected = this.productPriceBook.find(p => p.Id === id);
             if (selected) {
                 const unitPrice = selected.INID_Unit_Price__c || 0;
-                const quantity = selected.INID_Quantity__c;
+                const quantity = 1;
                 const salePrice = unitPrice;
                 const total = salePrice * quantity;
 
@@ -103,23 +103,23 @@ export default class InidAddProduct extends LightningElement {
                 `<input style="text-align: center;" type="checkbox" />`,
                 `<div style="text-align: left;">${product.code}</div>`,
                 `<div style="text-align: left;">${product.description}</div>`,
-                product.unitPrice === 0 ? '-' : product.unitPrice.toFixed(2),
+                product.unitPrice === 0 ? '-' : product.unitPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
 
-                `<input type="number" 
+                `<input type="text" 
                     data-index="${index}" 
-                    value="${product.quantity || 0}" 
+                    value="${(product.quantity || 0).toLocaleString(undefined, {maximumFractionDigits: 0 })}" 
                     min="0"
                     class="quantity-input"
                     style="width:100%; text-align: center;" />`,
 
-                `<input type="number"
+                `<input type="text"
                     data-index="${index}" 
-                    value="${(product.salePrice || 0).toFixed(2)}"
+                    value="${(product.salePrice || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}"
                     min="0"
                     class="sale-price-input"
                     style="width:100%; text-align: center;" />`,
                 `<div style="text-align: center;">${product.unit || '-'}</div>`,
-                product.total.toFixed(2)
+                product.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
             ]);
         });
 

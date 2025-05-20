@@ -88,13 +88,15 @@
              
     
             <!-- Start Footer Quick Action Panel -->
-            <div slot="footer" class="btnProduct main_product" style="display: flex; justify-content: end;" >
-                <div class="btn_next">
-                    <lightning-button variant="brand" label="Delete" onclick={handleDeleteSelected}></lightning-button>
+            <div slot="footer" class="btnProduct main_product" style="display: flex; justify-content: space-between;" >
+                <div>
                     <lightning-button variant="neutral" label="Cancel" onclick={handleCancel}></lightning-button>
-                    <lightning-button variant="brand" label="Save" onclick={handleSave} ></lightning-button>
                 </div>
-                
+                <div>
+                    <lightning-button style="margin-right:16px" variant="brand" label="Delete" onclick={handleDeleteSelected}></lightning-button>
+                    <lightning-button variant="brand" label="Save" onclick={handleSave} ></lightning-button>
+
+                </div>
             </div>
             <!-- End Footer Quick Action Panel -->
         </lightning-quick-action-panel>
