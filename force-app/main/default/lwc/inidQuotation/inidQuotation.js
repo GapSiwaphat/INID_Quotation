@@ -1,217 +1,351 @@
-import { LightningElement, track, wire } from 'lwc';
-import { loadScript, loadStyle } from 'lightning/platformResourceLoader';
-import datatables from '@salesforce/resourceUrl/datatables';
-import jquery from '@salesforce/resourceUrl/jquery';
+import { LightningElement, track, wire , api } from 'lwc';
+import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 import { CloseActionScreenEvent } from 'lightning/actions';
-import fetchDataProductPriceBook from '@salesforce/apex/INID_OrderTest.fetchDataProductPriceBook';
+import LightningConfirm from 'lightning/confirm';
+import fetchDataProductPriceBook from '@salesforce/apex/INID_OrderTest.fetchDataProductPriceBook'
 
 export default class InidAddProduct extends LightningElement {
-    @track productPriceBook = [];
-    @track selectedProducts = [];
-    @track filteredProductOptions = [];
-    @track showProductDropdown = false;
+    
+    @track productPriceBook = [] ;
     @track searchProductTerm = '';
+    @track showProductDropdown = false;
+    @track filteredProductOptions = [];
+    isShowAddfromText = false ;
+    @track textareaValue = '';
+    @track draftValues = [];
+    @track selectedRowIds = [];
+    @track selectedProducts = [];
 
-    dataTableInstance;
-    datatableInitialized = false;
+
 
     @wire(fetchDataProductPriceBook)
     wiredproductPriceBook({ error, data }) {
         if (data) {
             this.productPriceBook = data;
+            //  alert('Fetched Products:\n' + JSON.stringify(this.productPriceBook, null, 2));
         } else if (error) {
-            console.error('Error fetching products:', error);
+            console.error('Error fetching accounts:', error);
         }
     }
 
-    connectedCallback() {
-        Promise.all([
-            loadScript(this, jquery + '/jquery.min.js'),
-            loadScript(this, datatables + '/jquery.dataTables.min.js'),
-            loadStyle(this, datatables + '/jquery.dataTables.min.css')
-        ]).then(() => {
-            this.initializeDataTable();
-            this.updateDataTable();
-        });
-    }
 
-    initializeDataTable() {
-        const table = this.template.querySelector('.product-table');
-        if (table && !this.dataTableInstance) {
-            this.dataTableInstance = $(table).DataTable({
-                searching: false,
-                paging: false,
-                ordering: false,
-                info: false,
-                responsive: false
-            });
-        }
-    }
+    columns = [
+        { label: 'Material Code', fieldName: 'code', type: 'text', hideDefaultActions: true ,  cellAttributes: { alignment: 'center' },},
+        { label: 'SKU Description', fieldName: 'description', type: 'text', hideDefaultActions: true , cellAttributes: { alignment: 'center' }},
+        { label: 'Unit Price', fieldName: 'unitPrice', type: 'currency' , typeAttributes: {minimumFractionDigits: 2}, hideDefaultActions: true, cellAttributes: { alignment: 'center' } ,},
+        { label: 'Quantity', fieldName: 'quantity', type: 'text', editable: true, hideDefaultActions: true , cellAttributes: { alignment: 'center' } , },
+        { label: 'Sale Price', fieldName: 'salePrice', type: 'currency' , typeAttributes: {minimumFractionDigits: 2}, editable: true , hideDefaultActions: true ,  cellAttributes: { alignment: 'center' }},
+        { label: 'Unit', fieldName: 'unit', type: 'text', hideDefaultActions: true ,  cellAttributes: { alignment: 'center' }},
+        { label: 'Total', fieldName: 'total', type: 'currency' , typeAttributes: {minimumFractionDigits: 2}, hideDefaultActions: true ,  cellAttributes: { alignment: 'center' }},
+    ];
 
-    //Function handle Input Product
     handleInputProduct(event) {
-        this.searchProductTerm = event.target.value.toLowerCase();
-        this.showProductDropdown = this.searchProductTerm.length > 2;
+        this.searchProductTerm = event.target.value;
+        const term = this.searchProductTerm.toLowerCase().trim();
+
+        this.showProductDropdown = term.length > 2;
+
         this.filteredProductOptions = this.productPriceBook.filter(p => {
-            const nameStr = p.INID_SKU_Description__c?.toLowerCase() || '';
-            const codeStr = p.INID_Material_Code__c?.toLowerCase() || '';
-            return nameStr.includes(this.searchProductTerm) || codeStr.includes(this.searchProductTerm);
+            const nameStr = p.INID_SKU_Description__c ? p.INID_SKU_Description__c.toLowerCase() : '';
+            const codeStr = p.INID_Material_Code__c ? p.INID_Material_Code__c.toLowerCase() : '';
+
+            return nameStr.includes(term) || codeStr.includes(term);
         });
     }
 
-    //Function handle Select Product
     handleSelectProduct(event) {
-        const id = event.currentTarget.dataset.id;
-        const existing = this.selectedProducts.find(p => p.id === id);
+        const selectedId = event.currentTarget.dataset.id;
+        const selected = this.productPriceBook.find(p => p.Id === selectedId);
 
-        if (!existing) {
-            const selected = this.productPriceBook.find(p => p.Id === id);
-            if (selected) {
-                const unitPrice = selected.INID_Unit_Price__c || 0;
-                const quantity = 1;
-                const salePrice = unitPrice;
-                const total = salePrice * quantity;
-
-                const newProduct = {
-                    id: selected.Id,
-                    code: selected.INID_Material_Code__c,
-                    description: selected.INID_SKU_Description__c,
-                    quantity,
-                    unit: selected.INID_Unit__c,
-                    unitPrice,
-                    salePrice,
-                    total
-                };
-
-                this.selectedProducts = [...this.selectedProducts, newProduct];
-                this.updateDataTable();
-            }
+        const isDuplicate = this.selectedProducts.some(p => p.id === selectedId);
+        if (!isDuplicate && selected) {
+            const product = this.mapProduct(selected);
+            this.selectedProducts = [...this.selectedProducts, product];
+            console.log('selectedProducts:', JSON.stringify(this.selectedProducts));
         }
-
         this.searchProductTerm = '';
         this.showProductDropdown = false;
     }
 
-    //Data TAble Update
-    updateDataTable() {
-        if (!this.dataTableInstance) return;
+    mapProduct(source, addedAddons = []) {
+        const isMainProduct = source.INID_Unit_Price__c > 0;
+        const hasAddon = addedAddons.includes(source.INID_Material_Code__c);
 
-        this.dataTableInstance.clear();
+        // const quantity = 1;
 
-        this.selectedProducts.forEach((product, index) => {
-            this.dataTableInstance.row.add([
-                `<input style="text-align: center;" type="checkbox" />`,
-                `<div style="text-align: left;">${product.code}</div>`,
-                `<div style="text-align: left;">${product.description}</div>`,
-                product.unitPrice === 0 ? '-' : product.unitPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+        const salePrice = source.INID_Unit_Price__c || 0;
+        const quantity = 1;
+        const total = salePrice * quantity;
 
-                `<input type="text" 
-                    data-index="${index}" 
-                    value="${(product.quantity || 0).toLocaleString(undefined, {maximumFractionDigits: 0 })}" 
-                    min="0"
-                    class="quantity-input"
-                    style="width:100%; text-align: center;" />`,
+        return {
+            id: source.Id,
+            code: source.INID_Material_Code__c,
+            description: source.INID_SKU_Description__c,
+            unitPrice: source.INID_Unit_Price__c || 0,
+            quantity: 1,
+            salePrice: source.INID_Unit_Price__c || 0,
+            unit: source.INID_Unit__c || '',
+            total: total,
 
-                `<input type="text"
-                    data-index="${index}" 
-                    value="${(product.salePrice || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}"
-                    min="0"
-                    class="sale-price-input"
-                    style="width:100%; text-align: center;" />`,
-                `<div style="text-align: center;">${product.unit || '-'}</div>`,
-                product.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-            ]);
-        });
+            addOnButton: isMainProduct ? 'Add On' : null,
+            addOnText: !isMainProduct ? 'Add-On Item' : null ,
+            addOn: isMainProduct ? 'true' : 'false' ,
+            // isAddOn: !isMainProduct ,
 
-        this.dataTableInstance.draw();
+            nameBtn: isMainProduct ? '+' : 'Add-On Item' ,
+            variant: 'brand' ,
 
-        // 👇 Add this block: Re-bind event listeners after draw
-        setTimeout(() => {
-            const table = this.template.querySelector('.product-table');
-
-            const quantityInputs = table.querySelectorAll('.quantity-input');
-            quantityInputs.forEach(input => {
-                input.removeEventListener('change', this.handleQuantityChange);
-                input.addEventListener('change', this.handleQuantityChange.bind(this));
-            });
-
-            const salePriceInputs = table.querySelectorAll('.sale-price-input');
-            salePriceInputs.forEach(input => {
-                input.removeEventListener('change', this.handleSalePriceChange);
-                input.addEventListener('change', this.handleSalePriceChange.bind(this));
-            });
-        }, 0); // wait for DOM to render
+            addonDisabled: isMainProduct && hasAddon
+        };
     }
 
-    //Function handleDeleteSelected
-    handleDeleteSelected() {
-        const table = this.template.querySelector('.product-table');
-        const checkboxes = table.querySelectorAll('tbody input[type="checkbox"]:checked');
-        const selectedCodes = new Set();
+    showProductCode() {
+        this.isShowAddfromText = !this.isShowAddfromText;
+    }
 
-        checkboxes.forEach(checkbox => {
-            const row = checkbox.closest('tr');
-            const rowData = this.dataTableInstance.row(row).data();
-            const match = rowData[1].match(/>(.*?)</);
-            const materialCode = match ? match[1].trim() : null;
-            if (materialCode) selectedCodes.add(materialCode);
-        });
+    enterProductOnchange(event){
+        const textareaValue = event.target.value || '';
+        const uniqueCodes = new Set();
 
-        if (selectedCodes.size === 0) {
-            alert('กรุณาเลือกรายการที่ต้องการลบ');
-            return;
+        this.enteredProductCodes = textareaValue
+            .split('\n')
+            .map(code => code.trim())
+            .filter(code => {
+                if (code.length === 0) return false;
+                const normalized = code.toLowerCase();
+                if (uniqueCodes.has(normalized)) return false;
+                uniqueCodes.add(normalized);
+                return true;
+            });
+
+        console.log('Unique Product Codes entered:', this.enteredProductCodes);
+    }
+
+    addProductToTable() {
+        if (!this.enteredProductCodes || this.enteredProductCodes.length === 0) {
+            this.dispatchEvent(new ShowToastEvent({
+                title: 'ไม่มีข้อมูล',
+                message: 'กรุณากรอกรหัสสินค้าอย่างน้อย 1 รายการ',
+                variant: 'error'
+            }));
+            return; // ❗ หยุดทำงานทันที
         }
 
-        if (!confirm('คุณต้องการลบรายการที่เลือกหรือไม่?')) return;
+        const addedProducts = [];
+        const duplicatedCodes = [];
 
-        this.selectedProducts = this.selectedProducts.filter(p => !selectedCodes.has(p.code));
-        this.updateDataTable();
-    }
+        this.enteredProductCodes.forEach(code => {
+            const matched = this.productPriceBook.find(p => p.INID_Material_Code__c === code);
+            if (matched) {
+                const alreadyAdded = this.selectedProducts.some(p => p.code === code && p.unitPrice !== 0);
+                if (!alreadyAdded) {
+                    const salePrice = matched.INID_Unit_Price__c || 0;
+                    const quantity = 1;
+                    const total = salePrice * quantity;
 
-    //handle Select All
-    handleSelectAll(event) {
-        const isChecked = event.target.checked;
-        const checkboxes = this.template.querySelectorAll('tbody input[type="checkbox"]');
-        checkboxes.forEach(cb => cb.checked = isChecked);
-    }
+                    const product = {
+                        id: matched.Id,
+                        code: matched.INID_Material_Code__c,
+                        Name: matched.Name,
+                        description: matched.INID_SKU_Description__c,
+                        quantity: quantity,
+                        salePrice,
+                        unit: matched.INID_Unit__c,
+                        unitPrice: matched.INID_Unit_Price__c,
+                        total: total,
+                        nameBtn: '+' ,
+                        variant: 'brand'
+                        
+                    };
 
-    renderedCallback() {
-        const quantityInputs = this.template.querySelectorAll('.quantity-input')
-        const salePriceInputs = this.template.querySelectorAll('.sale-price-input');
-
-        quantityInputs.forEach(input => {
-            input.addEventListener('change', this.handleQuantityChange.bind(this));
+                    addedProducts.push(product);
+                } else {
+                    duplicatedCodes.push(code);
+                }
+            } else {
+                duplicatedCodes.push(code);
+            }
         });
 
-        salePriceInputs.forEach(input => {
-            input.addEventListener('change', this.handleSalePriceChange.bind(this));
+        if (addedProducts.length > 0) {
+            this.selectedProducts = [...this.selectedProducts, ...addedProducts];
+            this.isShowAddfromText = false ;
+
+        }
+
+        if (duplicatedCodes.length > 0) {
+            this.dispatchEvent(new ShowToastEvent({
+                title: 'แจ้งเตือนพบข้อผิดพลาด',
+                message: `สินค้าต่อไปนี้มีอยู่ในตารางแล้วหรือไม่พบ: ${duplicatedCodes.join(', ')}`,
+                variant: 'warning'
+            }));
+        }
+
+        this.textareaValue = '';
+        this.enteredProductCodes = [];
+
+        const textarea = this.template.querySelector('lightning-textarea');
+        if (textarea) {
+            textarea.value = '';
+        }
+    }
+
+    get hasSelectedProducts() {
+        return this.selectedProducts && this.selectedProducts.length > 0;
+    }
+
+
+    handleSaveEditedRows(event) {
+        const updatedValues = event.detail.draftValues;
+
+        this.selectedProducts = this.selectedProducts.map(product => {
+            const updated = updatedValues.find(d => d.id === product.id);
+            if (updated) {
+                const qty = Number(updated.quantity ?? product.quantity);
+                const price = Number(updated.salePrice ?? product.salePrice);
+                return {
+                    ...product,
+                    quantity: qty,
+                    salePrice: price,
+                    total: qty * price
+                };
+            }
+            return product; 
         });
+
+        this.draftValues = []; // เคลียร์ draft เพื่อซ่อนปุ่ม
+
+        this.dispatchEvent(
+            new ShowToastEvent({
+                title: 'Success',
+                message: 'Edit field successfully',
+                variant: 'success'
+            })
+        );
     }
 
-    handleQuantityChange(event) {
-        const index = Number(event.target.dataset.index);
-        const newQty = parseFloat(event.target.value);
-        const salePrice = this.selectedProducts[index].salePrice || 0;
+    handleRowAction(event) {
+        const actionName = event.detail.action.name;
+        const row = event.detail.row;
 
-        this.selectedProducts[index].quantity = isNaN(newQty) ? 0 : newQty;
-        this.selectedProducts[index].total = salePrice * this.selectedProducts[index].quantity;
+        // ตรวจสอบว่า row นี้เป็น Add-on หรือไม่
+        const isAddon = row.unitPrice === 0;
 
-        this.updateDataTable();
+        if (actionName === 'btnAddOn') {
+            if (isAddon) {
+                return;
+            }
+
+            // กรณีเป็นสินค้าหลัก → เปิด popup
+            this.currentMaterialCodeForAddOn = row.code;
+            this.isPopupOpenFreeGood = true;
+        }
     }
+    
+    handleRowSelection(event) {
+        const selectedRows = event.detail.selectedRows;
+        let newSelectedIds = [];
 
+        selectedRows.forEach(row => {
+            const isMain = row.unitPrice !== 0;
 
-    handleSalePriceChange(event) {
-        const index = Number(event.target.dataset.index);
-        const newSalePrice = parseFloat(event.target.value);
-        const quantity = this.selectedProducts[index].quantity || 0;
+            if (isMain) {
+                // หาตัว Add-on ที่เกี่ยวข้องกับ main ตัวนี้
+                const relatedAddons = this.selectedProducts.filter(
+                    p => p.productCode === row.code && p.unitPrice === 0
+                );
 
-        this.selectedProducts[index].salePrice = isNaN(newSalePrice) ? 0 : newSalePrice;
-        this.selectedProducts[index].total = this.selectedProducts[index].salePrice * quantity;
+                // เก็บ id ทั้ง main + add-on
+                newSelectedIds.push(row.id);
+                relatedAddons.forEach(addon => {
+                    newSelectedIds.push(addon.id);
+                });
+            } else {
+                // ถ้าเป็น Add-on เลือกแค่ตัวมันเอง
+                newSelectedIds.push(row.id);
+            }
+        });
 
-        this.updateDataTable();
+        // กำจัด ID ซ้ำด้วย Set แล้วแปลงกลับเป็น array
+        this.selectedRowIds = [...new Set(newSelectedIds)];
     }
 
     handleCancel() {
-        this.dispatchEvent(new CloseActionScreenEvent());
+        this.isShowOrder = true;
+        this.isShowAddProduct = false;
+        this.isShowSummary = false;
+        this.isShowApplyPromotion = false ; 
     }
+
+    async handleDeleteSelected() {
+        if (!Array.isArray(this.selectedRowIds) || this.selectedRowIds.length === 0) {
+            this.dispatchEvent(new ShowToastEvent({
+                title: 'ไม่มีรายการถูกเลือกเลย',
+                message: 'กรุณาเลือกอย่างน้อย 1 รายการ',
+                variant: 'warning'
+            }));
+            return;
+        }
+
+        // นับจำนวนแถวที่จะถูกลบ (รวม Add-on)
+        const selectedIdsSet = new Set(this.selectedRowIds);
+
+        const selectedMainCodes = this.selectedProducts
+            .filter(p => selectedIdsSet.has(p.id) && p.unitPrice !== 0)
+            .map(p => p.code);
+
+        const toBeDeleted = this.selectedProducts.filter(product => {
+            const isSelected = selectedIdsSet.has(product.id);
+            const isAddonOfDeletedMain = selectedMainCodes.includes(product.productCode);
+            return isSelected || isAddonOfDeletedMain;
+        });
+
+        // แสดงกล่องยืนยันก่อนลบ
+        const result = await LightningConfirm.open({
+            message: `คุณแน่ใจหรือไม่ว่าต้องการลบทั้งหมด ${toBeDeleted.length} รายการ`,
+            variant: 'header',
+            label: 'ยืนยันการลบ',
+            theme: 'warning'
+        });
+
+        if (!result) {
+            return; // ผู้ใช้กดยกเลิก
+        }
+
+        // ดำเนินการลบ
+        const deletedAddonProductCodes = toBeDeleted
+            .filter(p => p.unitPrice === 0)
+            .map(p => p.productCode);
+
+        this.selectedProducts = this.selectedProducts
+            .filter(product => !toBeDeleted.includes(product))
+            .map(product => {
+                if (product.unitPrice !== 0 && deletedAddonProductCodes.includes(product.code)) {
+                    return {
+                        ...product,
+                        addonDisabled: false
+                    };
+                }
+                return product;
+            });
+
+        this.selectedRowIds = [];
+
+        this.dispatchEvent(new ShowToastEvent({
+            title: 'ลบสำเร็จ',
+            message: `ลบรายการทั้งหมด ${toBeDeleted.length} รายการเรียบร้อยแล้ว`,
+            variant: 'success'
+        }));
+    }
+
+    handleSaveSuccess() {
+        const evt = new ShowToastEvent({
+            title: 'Save Successfully',
+            message: 'ข้อมูลถูกบันทึกเรียบร้อยแล้ว',
+            variant: 'success',
+            mode: 'sticky'
+        });
+        this.dispatchEvent(evt);
+    }
+
 }
