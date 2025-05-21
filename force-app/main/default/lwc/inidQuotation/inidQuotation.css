@@ -6,6 +6,11 @@
     font-size: 1.2rem !important;
 }
 
+:host ::part(column-header) {
+    justify-content: center;
+    text-align: center;
+}
+
 
 
 *{
@@ -31,12 +36,17 @@
     font-size: 14px !important;
 }
 
+.btn-back {
+    display: flex;
+    gap: 12px; /* หรือใช้ margin ก็ได้ */
+    justify-content: end;/* ถ้าต้องการให้ปุ่มไปชิดขวา */
+}
+
 .btn_next{
         display: flex;
         gap: 12px; /* หรือใช้ margin ก็ได้ */
         justify-content: end;/* ถ้าต้องการให้ปุ่มไปชิดขวา */
-        margin-top: 1rem;
-    }
+}
 
 .configure_button {
     font-size: 16px;
@@ -268,4 +278,5 @@ th , td {
 /* End Add Product */
 
 
-/* ๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒๒ */
+
+

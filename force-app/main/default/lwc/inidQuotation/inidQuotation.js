@@ -62,7 +62,17 @@ export default class InidAddProduct extends LightningElement {
             const product = this.mapProduct(selected);
             this.selectedProducts = [...this.selectedProducts, product];
             console.log('selectedProducts:', JSON.stringify(this.selectedProducts));
+        } else if (isDuplicate){
+            this.dispatchEvent(
+                new ShowToastEvent({
+                title: 'รายการซ้ำ',
+                message: 'สินค้านี้มีอยู่ในตารางแล้ว',
+                variant: 'warning',
+
+            })
+        );
         }
+
         this.searchProductTerm = '';
         this.showProductDropdown = false;
     }
@@ -133,12 +143,19 @@ export default class InidAddProduct extends LightningElement {
 
         const addedProducts = [];
         const duplicatedCodes = [];
+        const invalidCodes = [];
 
-        this.enteredProductCodes.forEach(code => {
-            const matched = this.productPriceBook.find(p => p.INID_Material_Code__c === code);
-            if (matched) {
+
+    this.enteredProductCodes.forEach(code => {
+        const matched = this.productPriceBook.find(p => p.INID_Material_Code__c === code);
+
+            if (!matched) {
+                invalidCodes.push(code); // ❌ ไม่พบสินค้า
+            } else {
                 const alreadyAdded = this.selectedProducts.some(p => p.code === code && p.unitPrice !== 0);
-                if (!alreadyAdded) {
+                if (alreadyAdded) {
+                    duplicatedCodes.push(code); 
+                } else {
                     const salePrice = matched.INID_Unit_Price__c || 0;
                     const quantity = 1;
                     const total = salePrice * quantity;
@@ -153,19 +170,15 @@ export default class InidAddProduct extends LightningElement {
                         unit: matched.INID_Unit__c,
                         unitPrice: matched.INID_Unit_Price__c,
                         total: total,
-                        nameBtn: '+' ,
+                        nameBtn: '+',
                         variant: 'brand'
-                        
                     };
 
                     addedProducts.push(product);
-                } else {
-                    duplicatedCodes.push(code);
                 }
-            } else {
-                duplicatedCodes.push(code);
             }
-        });
+    });
+
 
         if (addedProducts.length > 0) {
             this.selectedProducts = [...this.selectedProducts, ...addedProducts];
@@ -175,9 +188,17 @@ export default class InidAddProduct extends LightningElement {
 
         if (duplicatedCodes.length > 0) {
             this.dispatchEvent(new ShowToastEvent({
-                title: 'แจ้งเตือนพบข้อผิดพลาด',
-                message: `สินค้าต่อไปนี้มีอยู่ในตารางแล้วหรือไม่พบ: ${duplicatedCodes.join(', ')}`,
-                variant: 'warning'
+                title: 'รายการซ้ำ',
+                message: 'สินค้านี้มีอยู่ในตารางแล้ว',
+                variant: 'warning',
+            }));
+        }
+
+        if (invalidCodes.length > 0) {
+            this.dispatchEvent(new ShowToastEvent({
+                title: 'ไม่พบ Product Code ',
+                message: `กรุณาตรวจสอบ Product Code อีกครั้ง: ${invalidCodes.join(', ')}`,
+                variant: 'error'
             }));
         }
 
@@ -271,10 +292,7 @@ export default class InidAddProduct extends LightningElement {
     }
 
     handleCancel() {
-        this.isShowOrder = true;
-        this.isShowAddProduct = false;
-        this.isShowSummary = false;
-        this.isShowApplyPromotion = false ; 
+        this.dispatchEvent(new CloseActionScreenEvent());
     }
 
     async handleDeleteSelected() {
@@ -343,7 +361,6 @@ export default class InidAddProduct extends LightningElement {
             title: 'Save Successfully',
             message: 'ข้อมูลถูกบันทึกเรียบร้อยแล้ว',
             variant: 'success',
-            mode: 'sticky'
         });
         this.dispatchEvent(evt);
     }
