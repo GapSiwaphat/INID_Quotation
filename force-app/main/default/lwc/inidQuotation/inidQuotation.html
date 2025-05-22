@@ -1,6 +1,6 @@
 <template>
     <!-- Start Add Product -->
-        <lightning-quick-action-panel header="Add Product" class="title_product">
+        <lightning-quick-action-panel header="Add Product " class="title_product">
 
             <!-- Start Section การ Search Product -->
             <lightning-card>
@@ -95,7 +95,7 @@
                 </div>
                 <div class="btn_next">
                     <lightning-button variant="brand" label="Delete" onclick={handleDeleteSelected}></lightning-button>
-                    <lightning-button variant="brand" label="Save" onclick={handleSaveSuccess}></lightning-button>
+                    <lightning-button variant="brand" label="Save" disabled={isNextDisabled} onclick={handleSaveSuccess}></lightning-button>
                 </div>
                 
             </div>
@@ -105,7 +105,3 @@
 </template>
 
     <!-- End Add Product -->
-
-
-    
-   

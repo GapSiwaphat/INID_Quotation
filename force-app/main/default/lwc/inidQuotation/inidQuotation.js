@@ -28,15 +28,30 @@ export default class InidAddProduct extends LightningElement {
         }
     }
 
+    isLoaded = false;
+    renderedCallback() {
+        if(this.isLoaded) return;
+        const STYLE = document.createElement("style");
+        STYLE.innerText= `.uiModal .modal-container{
+            width: 1200px !important;
+            max-width: 95%;
+            min-width: 480px;
+            max-height: 100%;
+            min-height: 600px;
+        }`;
+        this.template.querySelector('lightning-card').appendChild(STYLE);
+        this.isLoaded=true;
+    }
 
-    columns = [
-        { label: 'Material Code', fieldName: 'code', type: 'text', hideDefaultActions: true ,  cellAttributes: { alignment: 'center' },},
-        { label: 'SKU Description', fieldName: 'description', type: 'text', hideDefaultActions: true , cellAttributes: { alignment: 'center' }},
-        { label: 'Unit Price', fieldName: 'unitPrice', type: 'currency' , typeAttributes: {minimumFractionDigits: 2}, hideDefaultActions: true, cellAttributes: { alignment: 'center' } ,},
-        { label: 'Quantity', fieldName: 'quantity', type: 'text', editable: true, hideDefaultActions: true , cellAttributes: { alignment: 'center' } , },
-        { label: 'Sale Price', fieldName: 'salePrice', type: 'currency' , typeAttributes: {minimumFractionDigits: 2}, editable: true , hideDefaultActions: true ,  cellAttributes: { alignment: 'center' }},
-        { label: 'Unit', fieldName: 'unit', type: 'text', hideDefaultActions: true ,  cellAttributes: { alignment: 'center' }},
-        { label: 'Total', fieldName: 'total', type: 'currency' , typeAttributes: {minimumFractionDigits: 2}, hideDefaultActions: true ,  cellAttributes: { alignment: 'center' }},
+
+   columns = [
+        { label: 'Material Code', fieldName: 'code', type: 'text', hideDefaultActions: true ,  cellAttributes: { alignment: 'right' }, initialWidth: 120},
+        { label: 'SKU Description', fieldName: 'description', type: 'text', hideDefaultActions: true , cellAttributes: { alignment: 'right' } , initialWidth: 267.50}, 
+        { label: 'Unit Price', fieldName: 'unitPrice', type: 'currency' , typeAttributes: {minimumFractionDigits: 2}, hideDefaultActions: true, cellAttributes: { alignment: 'right', } , initialWidth: 150},
+        { label: 'Quantity', fieldName: 'quantity', type: 'text', editable: true, hideDefaultActions: true , cellAttributes: { alignment: 'right' } , initialWidth: 100 }, 
+        { label: 'Sale Price', fieldName: 'salePrice', type: 'currency' , typeAttributes: {minimumFractionDigits: 2}, editable: {fieldName : 'editableSalePrice'} , hideDefaultActions: true ,  cellAttributes: { alignment: 'right'} , initialWidth: 175},
+        { label: 'Unit', fieldName: 'unit', type: 'text', hideDefaultActions: true ,  cellAttributes: { alignment: 'right' } , initialWidth: 100},
+        { label: 'Total', fieldName: 'total', type: 'currency' , typeAttributes: {minimumFractionDigits: 2}, hideDefaultActions: true ,  cellAttributes: { alignment: 'right' } , initialWidth: 170},
     ];
 
     handleInputProduct(event) {
@@ -104,8 +119,10 @@ export default class InidAddProduct extends LightningElement {
 
             nameBtn: isMainProduct ? '+' : 'Add-On Item' ,
             variant: 'brand' ,
+            editableSalePrice : true  ,
 
-            addonDisabled: isMainProduct && hasAddon
+            addonDisabled: isMainProduct && hasAddon,
+            // editableSalePrice : true,
         };
     }
 
@@ -171,7 +188,8 @@ export default class InidAddProduct extends LightningElement {
                         unitPrice: matched.INID_Unit_Price__c,
                         total: total,
                         nameBtn: '+',
-                        variant: 'brand'
+                        variant: 'brand',
+                        editableSalePrice : true 
                     };
 
                     addedProducts.push(product);
@@ -363,6 +381,10 @@ export default class InidAddProduct extends LightningElement {
             variant: 'success',
         });
         this.dispatchEvent(evt);
+    }
+
+    get isNextDisabled() {
+        return !(this.selectedProducts && this.selectedProducts.length > 0);
     }
 
 }
