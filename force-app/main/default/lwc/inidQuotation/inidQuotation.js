@@ -5,26 +5,28 @@ import LightningConfirm from 'lightning/confirm';
 import fetchDataProductPriceBook from '@salesforce/apex/INID_OrderTest.fetchDataProductPriceBook'
 import insertProductPriceBook from '@salesforce/apex/inidQuotation.insertProductPriceBook';
 
-
 export default class InidAddProduct extends LightningElement {
-    
-    @track productPriceBook = [] ;
-    @track searchProductTerm = '';
-    @track showProductDropdown = false;
-    @track filteredProductOptions = [];
-    isShowAddfromText = false ;
+
+
+    @track searchProductTerm = '';    
     @track textareaValue = '';
+
+    @track filteredProductOptions = [];     
+    @track productPriceBook = [] ;
     @track draftValues = [];
     @track selectedRowIds = [];
-    @track selectedProducts = [];
+    @track selectedProducts = [];    
+
+    @track showProductDropdown = false;
+    isShowAddfromText = false ;
 
     @api recordId;
     
+    //Get wiredproductPriceBook
     @wire(fetchDataProductPriceBook)
     wiredproductPriceBook({ error, data }) {
         if (data) {
             this.productPriceBook = data;
-            //  alert('Fetched Products:\n' + JSON.stringify(this.productPriceBook, null, 2));
         } else if (error) {
             console.error('Error fetching accounts:', error);
         }
@@ -69,6 +71,7 @@ export default class InidAddProduct extends LightningElement {
         });
     }
 
+    //Select Product To Table
     handleSelectProduct(event) {
         const selectedId = event.currentTarget.dataset.id;
         const selected = this.productPriceBook.find(p => p.Id === selectedId);
@@ -92,13 +95,10 @@ export default class InidAddProduct extends LightningElement {
         this.searchProductTerm = '';
         this.showProductDropdown = false;
     }
-
+    // MapProduct To Table
     mapProduct(source, addedAddons = []) {
         const isMainProduct = source.INID_Unit_Price__c > 0;
         const hasAddon = addedAddons.includes(source.INID_Material_Code__c);
-
-        // const quantity = 1;
-
         const salePrice = source.INID_Unit_Price__c || 0;
         const quantity = 1;
         const total = salePrice * quantity;
@@ -116,7 +116,6 @@ export default class InidAddProduct extends LightningElement {
             addOnButton: isMainProduct ? 'Add On' : null,
             addOnText: !isMainProduct ? 'Add-On Item' : null ,
             addOn: isMainProduct ? 'true' : 'false' ,
-            // isAddOn: !isMainProduct ,
 
             nameBtn: isMainProduct ? '+' : 'Add-On Item' ,
             variant: 'brand' ,
@@ -131,6 +130,7 @@ export default class InidAddProduct extends LightningElement {
         this.isShowAddfromText = !this.isShowAddfromText;
     }
 
+    //Enter Product Code 1 Per Line
     enterProductOnchange(event){
         const textareaValue = event.target.value || '';
         const uniqueCodes = new Set();
@@ -149,6 +149,7 @@ export default class InidAddProduct extends LightningElement {
         console.log('Unique Product Codes entered:', this.enteredProductCodes);
     }
 
+    //enter at least 1 product code
     addProductToTable() {
         if (!this.enteredProductCodes || this.enteredProductCodes.length === 0) {
             this.dispatchEvent(new ShowToastEvent({
@@ -156,27 +157,23 @@ export default class InidAddProduct extends LightningElement {
                 message: 'กรุณากรอกรหัสสินค้าอย่างน้อย 1 รายการ',
                 variant: 'error'
             }));
-            return; // ❗ หยุดทำงานทันที
+            return; //หยุดทำงานทันที
         }
-
         const addedProducts = [];
         const duplicatedCodes = [];
         const invalidCodes = [];
-
-
-    this.enteredProductCodes.forEach(code => {
-        const matched = this.productPriceBook.find(p => p.INID_Material_Code__c === code);
-
-            if (!matched) {
-                invalidCodes.push(code); // ❌ ไม่พบสินค้า
-            } else {
-                const alreadyAdded = this.selectedProducts.some(p => p.code === code && p.unitPrice !== 0);
-                if (alreadyAdded) {
-                    duplicatedCodes.push(code); 
+        this.enteredProductCodes.forEach(code => {
+            const matched = this.productPriceBook.find(p => p.INID_Material_Code__c === code);
+                if (!matched) {
+                    invalidCodes.push(code); // ไม่พบสินค้า
                 } else {
-                    const salePrice = matched.INID_Unit_Price__c || 0;
-                    const quantity = 1;
-                    const total = salePrice * quantity;
+                    const alreadyAdded = this.selectedProducts.some(p => p.code === code && p.unitPrice !== 0);
+                    if (alreadyAdded) {
+                        duplicatedCodes.push(code); 
+                    } else {
+                        const salePrice = matched.INID_Unit_Price__c || 0;
+                        const quantity = 1;
+                        const total = salePrice * quantity;
 
                     const product = {
                         id: matched.Id,
@@ -192,12 +189,10 @@ export default class InidAddProduct extends LightningElement {
                         variant: 'brand',
                         editableSalePrice : true 
                     };
-
-                    addedProducts.push(product);
+                        addedProducts.push(product);
+                    }
                 }
-            }
-    });
-
+         });
 
         if (addedProducts.length > 0) {
             this.selectedProducts = [...this.selectedProducts, ...addedProducts];
@@ -234,7 +229,7 @@ export default class InidAddProduct extends LightningElement {
         return this.selectedProducts && this.selectedProducts.length > 0;
     }
 
-
+    //Button Save Edit Row
     handleSaveEditedRows(event) {
         const updatedValues = event.detail.draftValues;
 
