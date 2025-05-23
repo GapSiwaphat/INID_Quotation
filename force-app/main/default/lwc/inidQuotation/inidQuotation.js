@@ -3,6 +3,8 @@ import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 import { CloseActionScreenEvent } from 'lightning/actions';
 import LightningConfirm from 'lightning/confirm';
 import fetchDataProductPriceBook from '@salesforce/apex/INID_OrderTest.fetchDataProductPriceBook'
+import insertProductPriceBook from '@salesforce/apex/inidQuotation.insertProductPriceBook';
+
 
 export default class InidAddProduct extends LightningElement {
     
@@ -16,8 +18,8 @@ export default class InidAddProduct extends LightningElement {
     @track selectedRowIds = [];
     @track selectedProducts = [];
 
-
-
+    @api recordId;
+    
     @wire(fetchDataProductPriceBook)
     wiredproductPriceBook({ error, data }) {
         if (data) {
@@ -53,7 +55,6 @@ export default class InidAddProduct extends LightningElement {
         { label: 'Unit', fieldName: 'unit', type: 'text', hideDefaultActions: true ,  cellAttributes: { alignment: 'right' } , initialWidth: 100},
         { label: 'Total', fieldName: 'total', type: 'currency' , typeAttributes: {minimumFractionDigits: 2}, hideDefaultActions: true ,  cellAttributes: { alignment: 'right' } , initialWidth: 170},
     ];
-
     handleInputProduct(event) {
         this.searchProductTerm = event.target.value;
         const term = this.searchProductTerm.toLowerCase().trim();
@@ -387,4 +388,44 @@ export default class InidAddProduct extends LightningElement {
         return !(this.selectedProducts && this.selectedProducts.length > 0);
     }
 
+    handleSave() {
+        // Map ค่าจาก selectedProducts ให้ตรงกับ Object field
+        const recordsToInsert = this.selectedProducts.map(prod => ({
+            INID_Material_Code__c: prod.code,
+            INID_SKU_Description__c: prod.description,
+            INID_Unit_Price__c: parseFloat(prod.unitPrice),
+            INID_Quantity__c: parseFloat(prod.quantity),
+            INID_Sale_Price__c: parseFloat(prod.salePrice),
+            INID_Unit__c: prod.unit
+        }));
+
+        //  ลอง alert ดูว่าค่าออกมาถูกมั้ย
+
+        //  เรียก Apex method ส่ง List เข้าไป
+        insertProductPriceBook({ products: recordsToInsert })
+            .then(() => {
+                this.handleSaveSuccess(); // เขียนฟังก์ชันนี้ไว้แสดง toast สำเร็จ
+            })
+            .catch(error => {
+                this.handleSaveError(error); // แก้ handleSaveError ดัก error ให้ดี
+            });
+    }
+
+
+    handleSaveError(error) {
+        console.error('Save Error:', JSON.stringify(error));
+        let msg = 'เกิดข้อผิดพลาดในการบันทึกข้อมูล';
+
+        if (error && error.body && error.body.message) {
+            msg = error.body.message;
+        } else if (error && error.message) {
+            msg = error.message;
+        }
+
+        this.dispatchEvent(new ShowToastEvent({
+            title: 'Error saving data',
+            message: msg,
+            variant: 'error',
+        }));
+}
 }
