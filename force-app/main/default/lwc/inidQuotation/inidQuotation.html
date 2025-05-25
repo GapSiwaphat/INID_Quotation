@@ -88,13 +88,13 @@
             <!-- End Data Table Of Product -->        
     
             <!-- Start Footer Quick Action Panel -->
-            <div slot="footer" class="btnProduct main_product" style="display: flex; justify-content: space-between;" >
+            <div slot="footer" class="main_product" style="display: flex; justify-content: space-between;" >
                 <div>
                      <lightning-button variant="neutral" label="Cancel" onclick={handleCancel}></lightning-button>
                 </div>
                 <div class="btn_next">
-                    <lightning-button variant="brand" label="Delete" onclick={handleDeleteSelected}></lightning-button>
-                    <lightning-button variant="brand" label="Save" onclick={handleSave}></lightning-button>
+                    <lightning-button variant="brand" label="Delete"  disabled={checkDataEnable}  onclick={handleDeleteSelected}></lightning-button>
+                    <lightning-button variant="brand" label="Save" disabled={checkDataEnable} onclick={handleSave}></lightning-button>
                 </div>
                 
             </div>

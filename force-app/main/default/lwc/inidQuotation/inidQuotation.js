@@ -36,12 +36,12 @@ export default class InidAddProduct extends LightningElement {
     renderedCallback() {
         if(this.isLoaded) return;
         const STYLE = document.createElement("style");
-        STYLE.innerText= `.uiModal .modal-container{
-            width: 1200px !important;
-            max-width: 95%;
-            min-width: 480px;
-            max-height: 100%;
-            min-height: 600px;
+        STYLE.innerText = `.uiModal .modal-container {
+            width: 80vw !important;
+            max-width: 95vw;
+            min-width: 60vw;
+            max-height: 100vh;
+            min-height: 55.56vh;
         }`;
         this.template.querySelector('lightning-card').appendChild(STYLE);
         this.isLoaded=true;
@@ -53,10 +53,11 @@ export default class InidAddProduct extends LightningElement {
         { label: 'SKU Description', fieldName: 'description', type: 'text', hideDefaultActions: true , cellAttributes: { alignment: 'right' } , initialWidth: 267.50}, 
         { label: 'Unit Price', fieldName: 'unitPrice', type: 'currency' , typeAttributes: {minimumFractionDigits: 2}, hideDefaultActions: true, cellAttributes: { alignment: 'right', } , initialWidth: 150},
         { label: 'Quantity', fieldName: 'quantity', type: 'text', editable: true, hideDefaultActions: true , cellAttributes: { alignment: 'right' } , initialWidth: 100 }, 
-        { label: 'Sale Price', fieldName: 'salePrice', type: 'currency' , typeAttributes: {minimumFractionDigits: 2}, editable: {fieldName : 'editableSalePrice'} , hideDefaultActions: true ,  cellAttributes: { alignment: 'right'} , initialWidth: 175},
+        { label: 'Sale Price', fieldName: 'salePrice', type: 'currency' , typeAttributes: {minimumFractionDigits: 2}, editable: {fieldName : 'editableSalePrice'} , hideDefaultActions: true ,  cellAttributes: { alignment: 'right'} , initialWidth: 155},
         { label: 'Unit', fieldName: 'unit', type: 'text', hideDefaultActions: true ,  cellAttributes: { alignment: 'right' } , initialWidth: 100},
-        { label: 'Total', fieldName: 'total', type: 'currency' , typeAttributes: {minimumFractionDigits: 2}, hideDefaultActions: true ,  cellAttributes: { alignment: 'right' } , initialWidth: 170},
+        { label: 'Total', fieldName: 'total', type: 'currency' , typeAttributes: {minimumFractionDigits: 2}, hideDefaultActions: true ,  cellAttributes: { alignment: 'right' } , initialWidth: 140},
     ];
+
     handleInputProduct(event) {
         this.searchProductTerm = event.target.value;
         const term = this.searchProductTerm.toLowerCase().trim();
@@ -252,8 +253,8 @@ export default class InidAddProduct extends LightningElement {
 
         this.dispatchEvent(
             new ShowToastEvent({
-                title: 'Success',
-                message: 'Edit field successfully',
+                title: 'เปลี่ยนแปลงข้อมูล',
+                message: 'เปลี่ยนแปลงข้อมูลสำเร็จ',
                 variant: 'success'
             })
         );
@@ -372,7 +373,7 @@ export default class InidAddProduct extends LightningElement {
 
     handleSaveSuccess() {
         const evt = new ShowToastEvent({
-            title: 'Save Successfully',
+            title: 'รายการแจ้งเตือน',
             message: 'ข้อมูลถูกบันทึกเรียบร้อยแล้ว',
             variant: 'success',
         });
@@ -391,7 +392,8 @@ export default class InidAddProduct extends LightningElement {
             INID_Unit_Price__c: parseFloat(prod.unitPrice),
             INID_Quantity__c: parseFloat(prod.quantity),
             INID_Sale_Price__c: parseFloat(prod.salePrice),
-            INID_Unit__c: prod.unit
+            INID_Unit__c: prod.unit ,
+            INID_Total__c: prod.total ,
         }));
 
         //  ลอง alert ดูว่าค่าออกมาถูกมั้ย
@@ -418,9 +420,13 @@ export default class InidAddProduct extends LightningElement {
         }
 
         this.dispatchEvent(new ShowToastEvent({
-            title: 'Error saving data',
+            title: 'แจ้งเตือนข้อผิดพลาด',
             message: msg,
             variant: 'error',
         }));
-}
+    }
+
+    get checkDataEnable() {
+        return this.selectedProducts.length === 0;
+    }
 }
