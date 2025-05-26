@@ -4,6 +4,7 @@ import { CloseActionScreenEvent } from 'lightning/actions';
 import LightningConfirm from 'lightning/confirm';
 import fetchDataProductPriceBook from '@salesforce/apex/INID_OrderTest.fetchDataProductPriceBook'
 import insertProductPriceBook from '@salesforce/apex/inidQuotation.insertProductPriceBook';
+import getRecordId from '@salesforce/apex/inidQuotation.getRecordId'
 
 export default class InidAddProduct extends LightningElement {
 
@@ -20,7 +21,19 @@ export default class InidAddProduct extends LightningElement {
     @track showProductDropdown = false;
     isShowAddfromText = false ;
 
+
+    //Get RecordId
     @api recordId;
+
+    @wire(getRecordId, { quoteId: '$recordId' })
+    wireGetRecordId({error , data}) {
+        // alert('recordId Apex : ' + this.recordId );
+        if(data) {
+            console.log('data : ' + data) ;
+        } else {
+            console.log(error) ;
+        }
+    } 
     
     //Get wiredproductPriceBook
     @wire(fetchDataProductPriceBook)
@@ -33,6 +46,8 @@ export default class InidAddProduct extends LightningElement {
     }
 
     isLoaded = false;
+    hasAlerted = false; 
+
     renderedCallback() {
         if(this.isLoaded) return;
         const STYLE = document.createElement("style");
@@ -45,6 +60,10 @@ export default class InidAddProduct extends LightningElement {
         }`;
         this.template.querySelector('lightning-card').appendChild(STYLE);
         this.isLoaded=true;
+
+        
+        // alert('RecordId: ' + this.recordId);
+
     }
 
 
@@ -378,67 +397,71 @@ export default class InidAddProduct extends LightningElement {
             variant: 'success',
         });
         this.dispatchEvent(evt);
+        
     }
 
     get isNextDisabled() {
         return !(this.selectedProducts && this.selectedProducts.length > 0);
     }
 
-    handleSave() {
-        // Map ค่าจาก selectedProducts ให้ตรงกับ Object field
+    async handleSave() {
+        if (!this.recordId) {
+            this.dispatchEvent(new ShowToastEvent({
+                title: 'Error',
+                message: 'ไม่พบ Quote Id',
+                variant: 'error'
+            }));
+            return;
+        }
+
+
         const recordsToInsert = this.selectedProducts.map(prod => ({
-            INID_Material_Code__c: prod.code,
-            INID_SKU_Description__c: prod.description,
-            INID_Unit_Price__c: parseFloat(prod.unitPrice),
             INID_Quantity__c: parseFloat(prod.quantity),
             INID_Sale_Price__c: parseFloat(prod.salePrice),
-            INID_Unit__c: prod.unit ,
-            INID_Total__c: prod.total ,
-            INID_Tatal__c: prod.total,  
-            INID_Quote__c: '0Q085000000R86LCAS',
+            INID_Quote__c: this.recordId,
             INID_Product_Price_Book__c: prod.id,
         }));
 
-        //  ลอง alert ดูว่าค่าออกมาถูกมั้ย
-
-        //  เรียก Apex method ส่ง List เข้าไป
-        insertProductPriceBook({ products: recordsToInsert })
-            .then(() => {
-                this.handleSaveSuccess(); // เขียนฟังก์ชันนี้ไว้แสดง toast สำเร็จ
-            })
-            .catch(error => {
-                this.handleSaveError(error); // แก้ handleSaveError ดัก error ให้ดี
-            });
+        try {
+            await insertProductPriceBook({ products: recordsToInsert });
+            this.handleSaveSuccess();
+            setTimeout(() => {
+                this.dispatchEvent(new CloseActionScreenEvent());
+            }, 500);
+        } catch (error) {
+            this.handleSaveError(error);
+        }
     }
 
 
-    // handleSaveError(error) {
-    //     console.error('Save Error:', JSON.stringify(error));
-    //     let msg = 'เกิดข้อผิดพลาดในการบันทึกข้อมูล : ' + error ;
-
-    //     if (error && error.body && error.body.message) {
-    //         msg = error.body.message;
-    //     } else if (error && error.message) {
-    //         msg = error.message;
-    //     }
-
-    //     this.dispatchEvent(new ShowToastEvent({
-    //         title: 'Error saving data',
-    //         message: msg,
-    //         variant: 'error',
-    //     }));
-    // }
 
     handleSaveError(error) {
         console.error('Save Error:', JSON.stringify(error));
+        let msg = 'เกิดข้อผิดพลาดในการบันทึกข้อมูล : ' + error ;
 
-        let msg = 'เกิดข้อผิดพลาดในการบันทึกข้อมูล :\n\n' + JSON.stringify(error, null, 2);
+        if (error && error.body && error.body.message) {
+            msg = error.body.message;
+        } else if (error && error.message) {
+            msg = error.message;
+        }
+
         this.dispatchEvent(new ShowToastEvent({
-            title: 'แจ้งเตือนข้อผิดพลาด',
+            title: 'Error saving data',
             message: msg,
             variant: 'error',
         }));
     }
+
+    // handleSaveError(error) {
+    //     console.error('Save Error:', JSON.stringify(error));
+
+    //     let msg = 'เกิดข้อผิดพลาดในการบันทึกข้อมูล :\n\n' + JSON.stringify(error, null, 2);
+    //     this.dispatchEvent(new ShowToastEvent({
+    //         title: 'แจ้งเตือนข้อผิดพลาด',
+    //         message: msg,
+    //         variant: 'error',
+    //     }));
+    // }
 
     get checkDataEnable() {
         return this.selectedProducts.length === 0;
