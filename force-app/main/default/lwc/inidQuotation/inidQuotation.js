@@ -394,6 +394,9 @@ export default class InidAddProduct extends LightningElement {
             INID_Sale_Price__c: parseFloat(prod.salePrice),
             INID_Unit__c: prod.unit ,
             INID_Total__c: prod.total ,
+            INID_Tatal__c: prod.total,  
+            INID_Quote__c: '0Q085000000R86LCAS',
+            INID_Product_Price_Book__c: prod.id,
         }));
 
         //  ลอง alert ดูว่าค่าออกมาถูกมั้ย
@@ -409,16 +412,27 @@ export default class InidAddProduct extends LightningElement {
     }
 
 
+    // handleSaveError(error) {
+    //     console.error('Save Error:', JSON.stringify(error));
+    //     let msg = 'เกิดข้อผิดพลาดในการบันทึกข้อมูล : ' + error ;
+
+    //     if (error && error.body && error.body.message) {
+    //         msg = error.body.message;
+    //     } else if (error && error.message) {
+    //         msg = error.message;
+    //     }
+
+    //     this.dispatchEvent(new ShowToastEvent({
+    //         title: 'Error saving data',
+    //         message: msg,
+    //         variant: 'error',
+    //     }));
+    // }
+
     handleSaveError(error) {
         console.error('Save Error:', JSON.stringify(error));
-        let msg = 'เกิดข้อผิดพลาดในการบันทึกข้อมูล';
 
-        if (error && error.body && error.body.message) {
-            msg = error.body.message;
-        } else if (error && error.message) {
-            msg = error.message;
-        }
-
+        let msg = 'เกิดข้อผิดพลาดในการบันทึกข้อมูล :\n\n' + JSON.stringify(error, null, 2);
         this.dispatchEvent(new ShowToastEvent({
             title: 'แจ้งเตือนข้อผิดพลาด',
             message: msg,
@@ -428,5 +442,6 @@ export default class InidAddProduct extends LightningElement {
 
     get checkDataEnable() {
         return this.selectedProducts.length === 0;
+        alert(msg); // แสดงเป็น alert แทน toast
     }
 }
