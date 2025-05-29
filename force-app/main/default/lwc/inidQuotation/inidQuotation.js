@@ -21,12 +21,13 @@ export default class InidAddProduct extends LightningElement {
     @track selectedProducts = [];
     @track showProductDropdown = false;
     @track quoteOrderItemValue = [];
+    @track itemNumberFormat = 0;
     quoteItemData; 
     @api recordId;
     isShowAddfromText = false;
     isLoaded = false;
     hasAlerted = false;
-    @track itemNumberFormat = '';
+
 
     columns = [
         { label: 'Material Code', fieldName: 'code', type: 'text', hideDefaultActions: true, cellAttributes: { alignment: 'right' }, initialWidth: 120 },
@@ -317,21 +318,11 @@ export default class InidAddProduct extends LightningElement {
             this.showToast('Error', 'ไม่พบ Quote Id', 'error');
             return;
         }
-        
-        // const recordsToInsert = this.selectedProducts.map(prod => ({
-        //         Id: prod.recordId,
-        //         INID_Quantity__c: parseFloat(prod.quantity),
-        //         INID_Sale_Price__c: parseFloat(prod.salePrice),
-        //         INID_Quote__c: this.recordId,
-        //         INID_Product_Price_Book__c: prod.id,
-        // }));
 
         let itemNumber = 0 ;
         const recordsToInsert = this.selectedProducts.map((prod) => {
-            // itemNumber = itemNumber + 1 
             itemNumber += 1 ;
-            this.itemNumberFormat = `0000${itemNumber}0` ;
-            //000010  , 000100 | 0000100
+            const formattedNumber = (itemNumber * 10).toString().padStart(6, '0');
 
             return {
                 Id: prod.recordId,
@@ -339,23 +330,27 @@ export default class InidAddProduct extends LightningElement {
                 INID_Sale_Price__c: parseFloat(prod.salePrice),
                 INID_Quote__c: this.recordId,
                 INID_Product_Price_Book__c: prod.id,
-                INID_Item_Number__c: this.itemNumberFormat,
-            }
-        })
+                INID_Item_Number__c: formattedNumber,
+            };
+        });
 
         try {
             await insertQuoteItem({ products: recordsToInsert });
             this.selectedProducts = [];
             await refreshApex(this.quoteItemData);
-            setTimeout( async () => {
-                this.dispatchEvent(new CloseActionScreenEvent())
-            }), 1000; 
-            this.handleSaveSuccess();
-                
+            this.handleSaveSuccess()
+            this.showToast('สำเร็จ', 'บันทึกรายการสำเร็จ', 'success');
+
+            setTimeout(() => {
+                this.dispatchEvent(new CloseActionScreenEvent());
+            }, 1000);
+
         } catch (error) {
             this.handleSaveError(error);
         }
     }
+
+
 
     handleSaveError(error) {
         console.error('Save Error:', JSON.stringify(error));
