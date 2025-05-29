@@ -3,7 +3,7 @@ import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 import { CloseActionScreenEvent } from 'lightning/actions';
 import LightningConfirm from 'lightning/confirm';
 import fetchDataProductPriceBook from '@salesforce/apex/INID_OrderTest.fetchDataProductPriceBook'
-import insertProductPriceBook from '@salesforce/apex/inidQuotation.insertProductPriceBook';
+import insertQuoteItem from '@salesforce/apex/inidQuotation.insertQuoteItem';
 import getRecordId from '@salesforce/apex/inidQuotation.getRecordId'
 import fetchQuoteItemById from '@salesforce/apex/inidQuotation.fetchQuoteItemById'
 
@@ -76,6 +76,7 @@ export default class InidAddProduct extends LightningElement {
             this.quoteOrderItemValue = data ;
             this.selectedProducts = this.quoteOrderItemValue.map((productItem) => {
                 return{
+                    recordId: productItem.Id, // เพิ่มตรงนี้ไว้ใช้กับ upsert
                     id: productItem.INID_Product_Price_Book__r.Id,
                     code: productItem.INID_Material_Code__c ,
                     description: productItem.INID_SKU_Description__c ,
@@ -279,13 +280,14 @@ export default class InidAddProduct extends LightningElement {
             return;
         }
         const recordsToInsert = this.selectedProducts.map(prod => ({
+            Id: prod.recordId, //มันบอกว่าต้องส่งค่า Id ของ record ที่จะอัพเดท
             INID_Quantity__c: parseFloat(prod.quantity),
             INID_Sale_Price__c: parseFloat(prod.salePrice),
             INID_Quote__c: this.recordId,
             INID_Product_Price_Book__c: prod.id,
         }));
         try {
-            await insertProductPriceBook({ products: recordsToInsert });
+            await insertQuoteItem({ products: recordsToInsert });
             this.handleSaveSuccess();
             setTimeout(() => this.dispatchEvent(new CloseActionScreenEvent()), 500);
         } catch (error) {

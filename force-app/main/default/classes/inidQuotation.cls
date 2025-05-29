@@ -1,7 +1,7 @@
 public with sharing class inidQuotation {
     @AuraEnabled()
-    public static void insertProductPriceBook(List<INID_Quote_Item__c> products) {
-        Insert products;
+    public static void insertQuoteItem(List<INID_Quote_Item__c> products) {
+        upsert products;
     }
 
     @AuraEnabled(cacheable=true)
