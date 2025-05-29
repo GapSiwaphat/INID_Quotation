@@ -6,6 +6,10 @@ import fetchDataProductPriceBook from '@salesforce/apex/INID_OrderTest.fetchData
 import insertQuoteItem from '@salesforce/apex/inidQuotation.insertQuoteItem';
 import getRecordId from '@salesforce/apex/inidQuotation.getRecordId'
 import fetchQuoteItemById from '@salesforce/apex/inidQuotation.fetchQuoteItemById'
+import deleteQuoteItems from '@salesforce/apex/inidQuotation.deleteQuoteItems'
+import { refreshApex } from '@salesforce/apex';
+
+
 
 export default class InidAddProduct extends LightningElement {
     @track searchProductTerm = '';
@@ -17,10 +21,12 @@ export default class InidAddProduct extends LightningElement {
     @track selectedProducts = [];
     @track showProductDropdown = false;
     @track quoteOrderItemValue = [];
+    quoteItemData; 
     @api recordId;
     isShowAddfromText = false;
     isLoaded = false;
     hasAlerted = false;
+    @track itemNumberFormat = '';
 
     columns = [
         { label: 'Material Code', fieldName: 'code', type: 'text', hideDefaultActions: true, cellAttributes: { alignment: 'right' }, initialWidth: 120 },
@@ -33,21 +39,27 @@ export default class InidAddProduct extends LightningElement {
     ];
 
     renderedCallback() {
-        if (this.isLoaded) return;
-        const STYLE = document.createElement('style');
-        STYLE.innerText = `
-            .uiModal .modal-container {
-                width: 80vw !important;
-                max-width: 95vw;
-                min-width: 60vw;
-                max-height: 100vh;
-                min-height: 55.56vh;
+        if (this.isLoaded) return; 
+            const STYLE = document.createElement('style');
+            STYLE.innerText = `
+                .uiModal .modal-container {
+                    width: 80vw !important;
+                    max-width: 95vw;
+                    min-width: 60vw;
+                    max-height: 100vh;
+                    min-height: 55.56vh;
+                }
+            `;
+            const card = this.template.querySelector('lightning-card');
+            if (card) card.appendChild(STYLE);
+            this.isLoaded = true;
+            if (this.quoteItemData) {
+                refreshApex(this.quoteItemData); 
             }
-        `;
-        const card = this.template.querySelector('lightning-card');
-        if (card) card.appendChild(STYLE);
-        this.isLoaded = true;
-    }
+        }
+      
+
+    
 
     // Apex wire: get record id
     @wire(getRecordId, { quoteId: '$recordId' })
@@ -71,12 +83,15 @@ export default class InidAddProduct extends LightningElement {
 
         // get data by qoute id
     @wire(fetchQuoteItemById, {quoteId: '$recordId'})
-    getDataByQuoteId({error , data}) {
+    getDataByQuoteId(result) {
+        this.quoteItemData = result; // เก็บไว้ใช้ refreshApex
+        const {error, data} = result;
         if(data) {
             this.quoteOrderItemValue = data ;
             this.selectedProducts = this.quoteOrderItemValue.map((productItem) => {
                 return{
-                    recordId: productItem.Id, // เพิ่มตรงนี้ไว้ใช้กับ upsert
+                    rowKey: productItem.Id,
+                    recordId: productItem.Id,
                     id: productItem.INID_Product_Price_Book__r.Id,
                     code: productItem.INID_Material_Code__c ,
                     description: productItem.INID_SKU_Description__c ,
@@ -128,6 +143,7 @@ export default class InidAddProduct extends LightningElement {
         const unitPrice = source.INID_Unit_Price__c || 0;
         const quantity = 1;
         return {
+            rowKey: source.Id,
             id: source.Id,
             code: source.INID_Material_Code__c,
             description: source.INID_SKU_Description__c,
@@ -182,6 +198,7 @@ export default class InidAddProduct extends LightningElement {
                     const unitPrice = match.INID_Unit_Price__c || 0;
                     const quantity = 1;
                     added.push({
+                        rowKey: match.Id,
                         id: match.Id,
                         code: match.INID_Material_Code__c,
                         Name: match.Name,
@@ -218,7 +235,7 @@ export default class InidAddProduct extends LightningElement {
     handleSaveEditedRows(event) {
         const updatedValues = event.detail.draftValues;
         this.selectedProducts = this.selectedProducts.map(product => {
-            const updated = updatedValues.find(d => d.id === product.id);
+            const updated = updatedValues.find(d => d.rowKey === product.rowKey);
             if (updated) {
                 const qty = Number(updated.quantity ?? product.quantity);
                 const price = Number(updated.salePrice ?? product.salePrice);
@@ -233,7 +250,8 @@ export default class InidAddProduct extends LightningElement {
     // Row selection handler
     handleRowSelection(event) {
         const selectedRows = event.detail.selectedRows || [];
-        this.selectedRowIds = selectedRows.map(row => row.id);
+        this.selectedRowIds = selectedRows.map(row => row.rowKey);
+        // alert('row Id:' + this.selectedRowIds);
     }
 
     handleCancel() {
@@ -247,7 +265,8 @@ export default class InidAddProduct extends LightningElement {
             return;
         }
         const selectedSet = new Set(this.selectedRowIds);
-        const toBeDeleted = this.selectedProducts.filter(product => selectedSet.has(product.id));
+        const toBeDeleted = this.selectedProducts.filter(p => selectedSet.has(p.rowKey));
+        this.selectedProducts = [...this.selectedProducts];
 
         const confirmed = await LightningConfirm.open({
             message: `คุณแน่ใจหรือไม่ว่าต้องการลบทั้งหมด ${toBeDeleted.length} รายการ`,
@@ -258,14 +277,33 @@ export default class InidAddProduct extends LightningElement {
 
         if (!confirmed) return;
 
-        this.selectedProducts = this.selectedProducts.filter(product => !selectedSet.has(product.id));
-        this.selectedRowIds = [];
-        this.showToast('ลบสำเร็จ', `ลบรายการทั้งหมด ${toBeDeleted.length} รายการเรียบร้อยแล้ว`, 'success');
+        const idsToDeleteInDB = toBeDeleted .filter(p => p.recordId).map(p => p.recordId);
+
+        try {
+            if (idsToDeleteInDB.length > 0) {
+                await deleteQuoteItems({ quoteItemIds: idsToDeleteInDB });
+            }
+
+            this.selectedProducts = this.selectedProducts.filter(p => !selectedSet.has(p.rowKey));
+            this.selectedProducts = [...this.selectedProducts]; // force UI update
+            this.selectedRowIds = [];
+                
+            await refreshApex(this.quoteItemData);
+            this.showToast('ลบข้อมูลแล้ว', 'ลบรายการจากระบบสำเร็จ', 'success');
+
+        } catch (error) {
+            this.handleSaveError(error);
+        }
     }
     
 
-    handleSaveSuccess() {
+    async handleSaveSuccess() {
         this.showToast('รายการแจ้งเตือน', 'ข้อมูลถูกบันทึกเรียบร้อยแล้ว', 'success');
+        
+        // Reload หน้า หลังจาก delay 2 วินาที
+        setTimeout(() => {
+            window.location.reload();
+        }, 500);
     }
 
     get isNextDisabled() {
@@ -279,17 +317,41 @@ export default class InidAddProduct extends LightningElement {
             this.showToast('Error', 'ไม่พบ Quote Id', 'error');
             return;
         }
-        const recordsToInsert = this.selectedProducts.map(prod => ({
-            Id: prod.recordId, //มันบอกว่าต้องส่งค่า Id ของ record ที่จะอัพเดท
-            INID_Quantity__c: parseFloat(prod.quantity),
-            INID_Sale_Price__c: parseFloat(prod.salePrice),
-            INID_Quote__c: this.recordId,
-            INID_Product_Price_Book__c: prod.id,
-        }));
+        
+        // const recordsToInsert = this.selectedProducts.map(prod => ({
+        //         Id: prod.recordId,
+        //         INID_Quantity__c: parseFloat(prod.quantity),
+        //         INID_Sale_Price__c: parseFloat(prod.salePrice),
+        //         INID_Quote__c: this.recordId,
+        //         INID_Product_Price_Book__c: prod.id,
+        // }));
+
+        let itemNumber = 0 ;
+        const recordsToInsert = this.selectedProducts.map((prod) => {
+            // itemNumber = itemNumber + 1 
+            itemNumber += 1 ;
+            this.itemNumberFormat = `0000${itemNumber}0` ;
+            //000010  , 000100 | 0000100
+
+            return {
+                Id: prod.recordId,
+                INID_Quantity__c: parseFloat(prod.quantity),
+                INID_Sale_Price__c: parseFloat(prod.salePrice),
+                INID_Quote__c: this.recordId,
+                INID_Product_Price_Book__c: prod.id,
+                INID_Item_Number__c: this.itemNumberFormat,
+            }
+        })
+
         try {
             await insertQuoteItem({ products: recordsToInsert });
+            this.selectedProducts = [];
+            await refreshApex(this.quoteItemData);
+            setTimeout( async () => {
+                this.dispatchEvent(new CloseActionScreenEvent())
+            }), 1000; 
             this.handleSaveSuccess();
-            setTimeout(() => this.dispatchEvent(new CloseActionScreenEvent()), 500);
+                
         } catch (error) {
             this.handleSaveError(error);
         }

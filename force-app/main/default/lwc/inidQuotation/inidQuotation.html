@@ -68,7 +68,7 @@
             <template if:true={hasSelectedProducts}>
                 <div class="datatable-container slds-m-top_medium main_product" style="padding-bottom: 150px;">
                     <lightning-datatable
-                        key-field="id"
+                        key-field="rowKey"
                         data={selectedProducts}
                         columns={columns}
                         onsave={handleSaveEditedRows}
@@ -95,7 +95,7 @@
                 </div>
                 <div class="btn_next">
                     <lightning-button variant="brand" label="Delete"  disabled={checkDataEnable}  onclick={handleDeleteSelected}></lightning-button>
-                    <lightning-button variant="brand" label="Save" disabled={checkDataEnable} onclick={handleSave}></lightning-button>
+                    <lightning-button variant="brand" label="Save" onclick={handleSave}></lightning-button>
                 </div>
                 
             </div>
