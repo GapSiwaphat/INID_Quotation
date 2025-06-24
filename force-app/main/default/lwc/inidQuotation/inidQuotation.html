@@ -20,11 +20,11 @@
                     <template if:true={showProductDropdown}>
                         <ul class="dropdown-list">
                             <template for:each={filteredProductOptions} for:item="prod">
-                                <li key={prod.Id}
-                                    data-id={prod.Id}
-                                    data-name={prod.INID_SKU_Description__c}
+                                <li key={prod.INID_Product_Price_Book__r.Id}
+                                    data-id={prod.INID_Product_Price_Book__r.Id}
+                                    data-name={prod.INID_Product_Price_Book__r.INID_SKU_Description__c}
                                     onclick={handleSelectProduct}>
-                                    {prod.INID_Material_Code__c} {prod.INID_SKU_Description__c}
+                                    {prod.INID_Product_Price_Book__r.INID_Material_Code__c} {prod.INID_Product_Price_Book__r.INID_SKU_Description__c}
                                 </li>
                             </template>
                         </ul>
