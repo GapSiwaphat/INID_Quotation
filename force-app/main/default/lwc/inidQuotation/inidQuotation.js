@@ -13,12 +13,17 @@ import fetchAccountLicense from '@salesforce/apex/INID_OrderController.fetchAcco
 import fetchClassifyLicense from '@salesforce/apex/INID_OrderController.fetchClassifyLicense' ;
 import fetchClassifyProduct from '@salesforce/apex/INID_OrderController.fetchClassifyProduct' ;
 import fetchClassifyType from '@salesforce/apex/INID_OrderController.fetchClassifyType' ;
+import fetchUserGroup from '@salesforce/apex/INID_OrderController.fetchUserGroup' ;
+import fetchBuGroupId from '@salesforce/apex/INID_OrderController.fetchBuGroupId' ;
+import fetchProductsByBuGroups from '@salesforce/apex/INID_OrderController.fetchProductsByBuGroups' ;
 import fetchProductLicenseExclude from '@salesforce/apex/INID_OrderController.fetchProductLicenseExclude' ;
 import { refreshApex } from '@salesforce/apex';
-
+import USER_ID from '@salesforce/user/Id';
 
 
 export default class InidAddProduct extends LightningElement {
+    @api recordId;
+
     @track searchProductTerm = '';
     @track textareaValue = '';
     @track filteredProductOptions = [];
@@ -30,28 +35,39 @@ export default class InidAddProduct extends LightningElement {
     @track quoteOrderItemValue = [];
     @track itemNumberFormat = 0;
     quoteItemData; 
-    @api recordId;
+
     isShowAddfromText = false;
     isLoaded = false;
     hasAlerted = false;
     @track accountId ;
     @track accountChannel ;
-    @track accountChannelData ;
-    @track accountLicenseData ;
-    @track accountLicenseId ;
-    @track accountLicense ;
-    @track fetchClassifyType; 
-    @track sellableClassifyIds ;
+    @track accountChannelData = [] ;
+    @track accountLicenseData = [] ;
+    @track accountLicenseId = [] ;
+    @track accountLicense = [] ;
+    @track classifyType = []; 
+    @track sellableClassifyIds = [] ;
     @track licenseExcludeData = [] ;
     @track productLicenseExclude = [] ;
 
+    @track userId = USER_ID;
+    @track userGroup ;
+    @track buGroupData = [];
+    @track buGroupId;
+    @track productsByBuGroups = [] ;
+    @track productBuGroupId = [] ;
+    @track productBuIds;
+    @track quoteId ;
+    @track classifyLicenseId ;
+    @track allBU ;
+    
 
     columns = [
         { label: 'Material Code', fieldName: 'code', type: 'text', hideDefaultActions: true, cellAttributes: { alignment: 'right' }, initialWidth: 120 },
         { label: 'SKU Description', fieldName: 'description', type: 'text', hideDefaultActions: true, cellAttributes: { alignment: 'right' }, initialWidth: 267.5 },
         { label: 'Unit Price', fieldName: 'unitPrice', type: 'currency', typeAttributes: { minimumFractionDigits: 2 }, hideDefaultActions: true, cellAttributes: { alignment: 'right' }, initialWidth: 150 },
         { label: 'Quantity', fieldName: 'quantity', type: 'text', editable: true, hideDefaultActions: true, cellAttributes: { alignment: 'right' }, initialWidth: 100 },
-        { label: 'Sale Price', fieldName: 'salePrice', type: 'currency', editable: true, typeAttributes: { minimumFractionDigits: 2 }, hideDefaultActions: true, cellAttributes: { alignment: 'right' }},
+        { label: 'Sale Price', fieldName: 'salePrice', type: 'currency',  editable: {fieldName : 'editableSalePrice'} , typeAttributes: { minimumFractionDigits: 2 }, hideDefaultActions: true, cellAttributes: { alignment: 'right' }},
         { label: 'Unit', fieldName: 'unit', type: 'text', hideDefaultActions: true, cellAttributes: { alignment: 'right' }, initialWidth: 100 },
         { label: 'Total', fieldName: 'total', type: 'currency', typeAttributes: { minimumFractionDigits: 2 }, hideDefaultActions: true, cellAttributes: { alignment: 'right' }, initialWidth: 140 },
     ];
@@ -74,151 +90,54 @@ export default class InidAddProduct extends LightningElement {
         if (this.quoteItemData) {
             refreshApex(this.quoteItemData); 
         }
+
     }
 
-    @wire(fetchClassifyLicense, {accountChannel: '$accountChannel' })
-    wiredFetchClassifyLicense({ error, data }) {
+    @wire(fetchUserGroup, {userId: '$userId'})
+    wiredUserGroup({ error, data }) {
         if (data) {
-            this.classifyLicense = JSON.parse(data);
-
-            this.classifyLicense = this.classifyLicense.map(record => {
-                const { attributes, ...clean } = record;
-                return clean;
-            });
-
-            // ✅ ดึง INID_Classify__c ไม่ซ้ำ
-            this.classifyLicenseId = [...new Set(
-                this.classifyLicense.map(record => record.INID_Classify__c)
-            )];
-
-            console.log('📌 classify license Id:', JSON.stringify(this.classifyLicenseId , null , 2));
-            console.log('✅ Clean classifyLicense:', JSON.stringify(this.classifyLicense, null, 2));
-
-            if (this.classifyLicenseId.length > 0) {
-                fetchClassifyType({ classifyId: this.classifyLicenseId })
-                    .then(result => {
-                        this.classifyType = result;
-                        console.log('✅ classify type:', JSON.stringify(this.classifyType, null, 2));
-
-                        this.summaryClassify = [];
-
-                        // 🔄 Map: ClassifyId → requireLicense
-                        const requireMap = {};
-                        this.classifyType.forEach(item => {
-                            requireMap[item.Id] = item.INID_Require_License__c;
-                        });
-
-                        // ✅ จัดกลุ่ม license ตาม classify/group
-                        const grouped = {};
-                        this.classifyLicense.forEach(record => {
-                            const classify = record.INID_Classify__c;
-                            const group = record.INID_License_Group__c;
-
-                            if (!grouped[classify]) {
-                                grouped[classify] = {};
-                            }
-                            if (!grouped[classify][group]) {
-                                grouped[classify][group] = [];
-                            }
-                            grouped[classify][group].push(record);
-                        });
-
-                        // ✅ ประมวลผลแต่ละ classify
-                        Object.keys(grouped).forEach(classify => {
-                            const requireLicense = requireMap[classify] === true;
-                            let canSell = false;
-                            let reason = '';
-                            let matchedGroup = null;
-
-                            const groups = grouped[classify];
-                            const groupNumbers = Object.keys(groups);
-
-                            const allLicenses = [];
-                            Object.values(groups).forEach(records => {
-                                records.forEach(r => {
-                                    if (!allLicenses.includes(r.INID_License__c)) {
-                                        allLicenses.push(r.INID_License__c);
-                                    }
-                                });
-                            });
-
-                            if (!requireLicense) {
-                                canSell = true;
-                                reason = 'ไม่ต้องใช้ license สามารถขายได้เลย';
-                            } else {
-                                if (groupNumbers.length === 1) {
-                                    const groupLicenses = groups[groupNumbers[0]].map(r => r.INID_License__c);
-                                    const hasAll = groupLicenses.every(lic => this.accountLicense.includes(lic));
-                                    canSell = hasAll;
-                                    reason = hasAll
-                                        ? 'ลูกค้ามี license ครบตามที่กลุ่มนี้กำหนด'
-                                        : 'ลูกค้าขาด license ที่จำเป็นในกลุ่มนี้';
-                                } else {
-                                    for (let groupNo of groupNumbers) {
-                                        const groupLicenses = groups[groupNo].map(r => r.INID_License__c);
-                                        const hasAll = groupLicenses.every(lic => this.accountLicense.includes(lic));
-                                        if (hasAll) {
-                                            canSell = true;
-                                            matchedGroup = groupNo;
-                                            reason = `ลูกค้ามี license ครบในกลุ่ม ${matchedGroup}`;
-                                            break;
-                                        }
-                                    }
-                                    if (!canSell) {
-                                        reason = 'ลูกค้าไม่มี license ครบในกลุ่มใดกลุ่มหนึ่ง';
-                                    }
-                                }
-                            }
-
-                            // ✅ เก็บสรุปผล
-                            this.summaryClassify.push({
-                                classifyId: classify,
-                                groups,
-                                reason,
-                                canSell,
-                                requireLicense,
-                                ...(matchedGroup ? { matchedGroup } : {})
-                            });
-
-                            // ✅ แสดง log
-                            console.log(`👉 Classify: ${classify}`);
-                            console.log(`   🔧 ต้องตรวจ license? : ${requireLicense}`);
-                            console.log(`   📌 License ของ Account: ${JSON.stringify(this.accountLicense)}`);
-                            console.log(`   📌 License ของ Classify: ${JSON.stringify(allLicenses)}`);
-
-                            if (groupNumbers.length === 1) {
-                                const groupLicenses = groups[groupNumbers[0]].map(r => r.INID_License__c);
-                                console.log(`   กลุ่มเลข: ${groupNumbers[0]} License ที่ต้องมีครบ: ${JSON.stringify(groupLicenses)}`);
-                            } else {
-                                console.log(`   กลุ่มทั้งหมดและ license ในแต่ละกลุ่ม:`);
-                                groupNumbers.forEach(groupNo => {
-                                    const groupLicenses = groups[groupNo].map(r => r.INID_License__c);
-                                    console.log(`      - กลุ่ม ${groupNo}: ${JSON.stringify(groupLicenses)}`);
-                                });
-                            }
-
-                            console.log(`   ขายได้หรือไม่: ${canSell ? ' ขายได้' : ' ขายไม่ได้'} (${reason})`);
-                            console.log('---------------------------------------------------');
-                        });
-
-                        // สร้างตัวแปรเฉพาะ Classify ที่ขายได้
-                        this.sellableClassifyIds = this.summaryClassify
-                            .filter(c => c.canSell)
-                            .map(c => c.classifyId);
-
-                        console.log('Sellable Classify Ids:', JSON.stringify(this.sellableClassifyIds));
-                    })
-                    .catch(err => {
-                        console.error(' Error fetching classify type:', err);
-                    });
-            }
-
+            this.userGroup = data;
+            console.log('user Gruop : ' + JSON.stringify(this.userGroup, null, 2) );
         } else if (error) {
-            console.error('Error fetching classify license:', error);
+            console.error('Error fetching accounts:', error);
         }
     }
-      
 
+    @wire(fetchBuGroupId, {userGroup: '$userGroup'})
+    wiredBuGroupId({ error, data }) {
+        if (data) {
+            this.buGroupData = data;
+            this.buGroupId = this.buGroupData.map(r => r.INID_BU_Group__c);
+            this.allBU = this.buGroupData.map(r => r.INID_All_BU__c).join(', ');
+            console.log('BU Gruop : ' + JSON.stringify(this.buGroupId, null, 2) );
+            console.log('All BU Gruop : ' + JSON.stringify(this.allBU, null, 2) );
+        } else if (error) {
+            console.error('Error fetching accounts:', error);
+        }
+    }
+
+    @wire(fetchProductsByBuGroups, {buGroupIds: '$buGroupId'})
+    wiredproductsByBuGroups({ error, data }) {
+        if (data) {
+            this.productsByBuGroups = data;
+            this.productBuGroupId = this.productsByBuGroups.map(r => r.INID_Product_Price_Book__c);
+            this.productBuIds = new Set(this.productBuGroupId); 
+            console.log('product price book by BU Group : ' + JSON.stringify(this.productBuGroupId, null, 2) );
+        } else if (error) {
+            console.error('Error fetching accounts:', error);
+        }
+    }
+
+    // Apex wire: get record id
+    @wire(getRecordId, { quoteId: '$recordId' })
+    wireGetRecordId({ error, data }) {
+        if (data) {
+            this.quoteId = data;
+            console.log('quoteId : ' + data);
+        } else {
+            console.log(error);
+        }
+    }
 
     @wire(fetchAccountIdByQuote , {quoteId: '$recordId'}) 
     wireFetchAccountIdByQuote({ error, data }) {
@@ -230,135 +149,191 @@ export default class InidAddProduct extends LightningElement {
         }
     }
 
-    // @wire(fetchAccountChannel , {accountId: '$accountId'})
-    // wiredAccountChannel({ error, data }) {
-    //     if (data) {
-    //         this.accountChannelData = data
-    //         // this.accountChannel = this.accountChannelData.map(channel => channel.INID_Channel__c);
-    //         this.accountChannel = this.accountChannelData[0]?.INID_Channel__c || '';
-
-    //         console.log('Account Channel ' + JSON.stringify(this.accountChannel , null ,2));
-    //     } else if (error) {
-    //         console.error('Error fetching accounts:', error);
-    //     }
-    // }
-
-    // @wire(fetchAccountLicense , {accountId: '$accountId'})
-    // wiredFetchAccountLicense({error , data}) {
-    //     if(data) {
-    //         this.accountLicenseData = data ;
-    //         this.accountLicenseId = this.accountLicenseData.map(accLicenseId => accLicenseId.Id) ;
-    //         this.accountLicense = this.accountLicenseData.map(acc => acc.INID_License__c);
-    //         console.log('account License : ' + JSON.stringify(this.accountLicense , null ,2)) ;
-    //     } else {
-    //         console.log(error) ;
-    //     }
-    // }
-
-    
-    // @wire(fetchClassifyProduct , {sellableClassifyIds: '$sellableClassifyIds'})
-    // wiredFetchClassifyProduct({error , data}) {
-    //     if(data) {
-    //         this.productPriceBook = data;
-    //         console.log('product price book ' + JSON.stringify(this.productPriceBook , null , 2));
-    //     } else if(error) {
-    //         console.error(error) ;
-    //     }
-    // }
-
-    // @wire(fetchProductLicenseExclude , {accountLicenseId: '$accountLicenseId'})
-    // wiredFetchProductLicenseExclude({error , data}) {
-    //     try {
-    //         if(data) {
-    //             this.licenseExcludeData = data ;
-    //             this.productLicenseExclude = this.licenseExcludeData.map(prodId => prodId.INID_Product_Price_Book__c);
-                
-    //             console.log('license Exclude data : ' + JSON.stringify(this.licenseExcludeData,null, 2)); 
-    //             console.log('Product Exclude' + JSON.stringify(this.productLicenseExclude, null, 2))
-    //         } else if(error) {
-    //             console.log('message error from fetch product license exclude is : ' + JSON.stringify(error , null ,2)) ;
-    //         }
-    //     } catch (e) {
-    //         console.error('🔥 Caught error:', JSON.stringify(e , null ,2));
-    //     }
-    // }
-
     @wire(fetchAccountChannel, { accountId: '$accountId' })
     wiredAccountChannel({ error, data }) {
-        console.log('📌 fetchAccountChannel called');
+        console.log(' fetchAccountChannel called');
         if (data) {
-            console.log('✅ fetchAccountChannel data:', JSON.stringify(data, null, 2));
+            console.log(' fetchAccountChannel data:', JSON.stringify(data, null, 2));
             this.accountChannelData = data;
             this.accountChannel = this.accountChannelData[0]?.INID_Channel__c || '';
-            console.log('👉 accountChannel:', this.accountChannel);
+            console.log(' accountChannel:', this.accountChannel);
+            console.log(' Type of accountChannel:', typeof(this.accountChannel));
         } else if (error) {
-            console.error('❌ fetchAccountChannel error:', JSON.stringify(error, null, 2));
+            console.error(' fetchAccountChannel error:', JSON.stringify(error, null, 2));
         }
+    }
+
+    @wire(fetchClassifyLicense, { accountChannel: '$accountChannel' })
+    wiredFetchClassifyLicense({ error, data }) {
+        if (data) {
+            try {
+                const parsed = typeof data === 'string' ? JSON.parse(data) : data;
+                this.classifyLicense = parsed.map(record => {
+                    const { attributes, ...clean } = record;
+                    return clean;
+                });
+
+                this.classifyLicenseId = [...new Set(
+                    this.classifyLicense.map(record => record.INID_Classify__c)
+                )];
+
+                console.log('Clean classifyLicense:', JSON.stringify(this.classifyLicense, null, 2));
+                console.log(' classify license Id:', JSON.stringify(this.classifyLicenseId, null, 2));
+            } catch (e) {
+                console.error(' Error processing classify license data:', e.message, e);
+            }
+        } else if (error) {
+            console.error(' Error fetching classify license:', error.body ? error.body.message : error.message, error);
+        }
+    }
+
+
+    // เมื่อ classifyLicenseId พร้อมแล้วให้ wire fetchClassifyType
+    @wire(fetchClassifyType, { classifyId: '$classifyLicenseId' })
+    wiredFetchClassifyType({ error, data }) {
+        if (data) {
+            this.classifyType = data;
+            console.log('classify type:', JSON.stringify(this.classifyType, null, 2));
+
+            this.processSummaryClassify();
+
+        } else if (error) {
+            console.error('Error fetching classify type:', error);
+        }
+    }
+
+    processSummaryClassify() {
+        this.summaryClassify = [];
+
+        const requireMap = {};
+        this.classifyType.forEach(item => {
+            requireMap[item.Id] = item.INID_Require_License__c;
+        });
+
+        const grouped = {};
+        this.classifyLicense.forEach(record => {
+            const classify = record.INID_Classify__c;
+            const group = record.INID_License_Group__c;
+
+            if (!grouped[classify]) {
+                grouped[classify] = {};
+            }
+            if (!grouped[classify][group]) {
+                grouped[classify][group] = [];
+            }
+            grouped[classify][group].push(record);
+        });
+
+        Object.keys(grouped).forEach(classify => {
+            const requireLicense = requireMap[classify] === true;
+            let canSell = false;
+            let reason = '';
+            let matchedGroup = null;
+
+            const groups = grouped[classify];
+            const groupNumbers = Object.keys(groups);
+
+            const allLicenses = [];
+            Object.values(groups).forEach(records => {
+                records.forEach(r => {
+                    if (!allLicenses.includes(r.INID_License__c)) {
+                        allLicenses.push(r.INID_License__c);
+                    }
+                });
+            });
+
+            if (!requireLicense) {
+                canSell = true;
+                reason = 'ไม่ต้องใช้ license สามารถขายได้เลย';
+            } else {
+                if (groupNumbers.length === 1) {
+                    const groupLicenses = groups[groupNumbers[0]].map(r => r.INID_License__c);
+                    const hasAll = groupLicenses.every(lic => this.accountLicense.includes(lic));
+                    canSell = hasAll;
+                    reason = hasAll
+                        ? 'ลูกค้ามี license ครบตามที่กลุ่มนี้กำหนด'
+                        : 'ลูกค้าขาด license ที่จำเป็นในกลุ่มนี้';
+                } else {
+                    for (let groupNo of groupNumbers) {
+                        const groupLicenses = groups[groupNo].map(r => r.INID_License__c);
+                        const hasAll = groupLicenses.every(lic => this.accountLicense.includes(lic));
+                        if (hasAll) {
+                            canSell = true;
+                            matchedGroup = groupNo;
+                            reason = `ลูกค้ามี license ครบในกลุ่ม ${matchedGroup}`;
+                            break;
+                        }
+                    }
+                    if (!canSell) {
+                        reason = 'ลูกค้าไม่มี license ครบในกลุ่มใดกลุ่มหนึ่ง';
+                    }
+                }
+            }
+
+            this.summaryClassify.push({
+                classifyId: classify,
+                groups,
+                reason,
+                canSell,
+                requireLicense,
+                ...(matchedGroup ? { matchedGroup } : {})
+            });
+
+            console.log(` Classify: ${classify}`);
+            console.log(`   ขายได้หรือไม่: ${canSell ? ' ขายได้' : ' ขายไม่ได้'} (${reason})`);
+            console.log('---------------------------------------------------');
+        });
+
+        this.sellableClassifyIds = this.summaryClassify
+            .filter(c => c.canSell)
+            .map(c => c.classifyId);
+
+        console.log('Sellable Classify Ids:', JSON.stringify(this.sellableClassifyIds));
     }
 
     @wire(fetchAccountLicense, { accountId: '$accountId' })
     wiredFetchAccountLicense({ error, data }) {
-        console.log('📌 fetchAccountLicense called');
+        console.log('fetchAccountLicense called');
         if (data) {
-            console.log('✅ fetchAccountLicense data:', JSON.stringify(data, null, 2));
+            console.log('fetchAccountLicense data:', JSON.stringify(data, null, 2));
             this.accountLicenseData = data;
             this.accountLicenseId = this.accountLicenseData.map(accLicenseId => accLicenseId.Id);
             this.accountLicense = this.accountLicenseData.map(acc => acc.INID_License__c);
-            console.log('👉 accountLicenseId:', JSON.stringify(this.accountLicenseId, null, 2));
-            console.log('👉 accountLicense:', JSON.stringify(this.accountLicense, null, 2));
+            console.log(' accountLicenseId:', JSON.stringify(this.accountLicenseId, null, 2));
+            console.log(' accountLicense:', JSON.stringify(this.accountLicense, null, 2));
         } else if (error) {
-            console.error('❌ fetchAccountLicense error:', JSON.stringify(error, null, 2));
+            console.error('fetchAccountLicense error:', JSON.stringify(error, null, 2));
         }
     }
 
     @wire(fetchClassifyProduct, { sellableClassifyIds: '$sellableClassifyIds' })
     wiredFetchClassifyProduct({ error, data }) {
-        console.log('📌 fetchClassifyProduct called');
+        console.log('fetchClassifyProduct called');
         if (data) {
-            console.log('✅ fetchClassifyProduct data:', JSON.stringify(data, null, 2));
+            console.log('fetchClassifyProduct data:', JSON.stringify(data, null, 2));
             this.productPriceBook = data;
         } else if (error) {
-            console.error('❌ fetchClassifyProduct error:', JSON.stringify(error, null, 2));
+            console.error('fetchClassifyProduct error:', JSON.stringify(error, null, 2));
         }
     }
 
     @wire(fetchProductLicenseExclude, { accountLicenseId: '$accountLicenseId' })
     wiredFetchProductLicenseExclude({ error, data }) {
-        console.log('📌 fetchProductLicenseExclude called');
+        console.log('fetchProductLicenseExclude called');
         try {
             if (data) {
-                console.log('✅ fetchProductLicenseExclude data:', JSON.stringify(data, null, 2));
+                console.log('fetchProductLicenseExclude data:', JSON.stringify(data, null, 2));
                 this.licenseExcludeData = data;
                 this.productLicenseExclude = this.licenseExcludeData.map(prodId => prodId.INID_Product_Price_Book__c);
-                console.log('👉 productLicenseExclude:', JSON.stringify(this.productLicenseExclude, null, 2));
+                console.log('productLicenseExclude:', JSON.stringify(this.productLicenseExclude, null, 2));
             } else if (error) {
-                console.error('❌ fetchProductLicenseExclude error:', JSON.stringify(error, null, 2));
+                console.error('fetchProductLicenseExclude error:', JSON.stringify(error, null, 2));
             }
         } catch (e) {
-            console.error('🔥 Caught error in fetchProductLicenseExclude:', JSON.stringify(e, null, 2));
+            console.error('Caught error in fetchProductLicenseExclude:', JSON.stringify(e, null, 2));
         }
     }
 
-
-    // Apex wire: get record id
-    @wire(getRecordId, { quoteId: '$recordId' })
-    wireGetRecordId({ error, data }) {
-        if (data) {
-            console.log('quoteId : ' + data);
-        } else {
-            console.log(error);
-        }
-    }
-
-    // Apex wire: fetch product price book
-    @wire(fetchDataProductPriceBook)
-    wiredproductPriceBook({ error, data }) {
-        if (data) {
-            this.productPriceBook = data;
-        } else if (error) {
-            console.error('Error fetching accounts:', error);
-        }
-    }
 
     // get data by qoute id
     @wire(fetchQuoteItemById, {quoteId: '$recordId'})
@@ -368,6 +343,14 @@ export default class InidAddProduct extends LightningElement {
         if(data) {
             this.quoteOrderItemValue = data ;
             this.selectedProducts = this.quoteOrderItemValue.map((productItem) => {
+                
+                let editableSalePrice = false;
+                if (this.allBU === "true") {
+                    editableSalePrice = true;
+                } else if (this.productBuIds && this.productBuIds.has(productPriceBookId)) {
+                    editableSalePrice = true;
+                }
+
                 return{
                     rowKey: productItem.Id,
                     recordId: productItem.Id,
@@ -379,6 +362,7 @@ export default class InidAddProduct extends LightningElement {
                     salePrice: productItem.INID_Sale_Price__c ,
                     unit: productItem.INID_Product_Price_Book__r.INID_Unit__c ,
                     total: productItem.INID_Quantity__c * productItem.INID_Sale_Price__c ,
+                    editableSalePrice
                 }
             })
         }else {
@@ -386,19 +370,6 @@ export default class InidAddProduct extends LightningElement {
         }
     }
 
-    // Product search input handler
-    // handleInputProduct(event) {
-    //     this.searchProductTerm = event.target.value;
-    //     const term = this.searchProductTerm.toLowerCase().trim();
-    //     this.showProductDropdown = term.length > 2;
-    //     this.filteredProductOptions = this.productPriceBook.filter(product => {
-    //         const productId = p.INID_Product_Price_Book__r.Id;
-    //         const description = (product.INID_Product_Price_Book__r.INID_SKU_Description__c || '').toLowerCase();
-    //         const materialCode = (product.INID_Product_Price_Book__r.INID_Material_Code__c || '').toLowerCase();
-    //         const isExcluded = this.productLicenseExclude.includes(productId);
-    //         return description.includes(term) || materialCode.includes(term);
-    //     });
-    // }
 
     handleInputProduct(event) {
         this.searchProductTerm = event.target.value;
@@ -439,9 +410,19 @@ export default class InidAddProduct extends LightningElement {
     mapProduct(source = []) {
         const unitPrice = source.INID_Product_Price_Book__r.INID_Unit_Price__c || 0;
         const quantity = 1;
+        const productPriceBookId = source.INID_Product_Price_Book__r.Id;
+
+        let editableSalePrice = false;
+
+        if (this.allBU === "true") {
+            editableSalePrice = true;
+        } else if (this.productBuIds && this.productBuIds.has(productPriceBookId)) {
+            editableSalePrice = true;
+        }
+
         return {
-            rowKey: source.INID_Product_Price_Book__r.Id,
-            id: source.INID_Product_Price_Book__r.Id,
+            rowKey: productPriceBookId,
+            id: productPriceBookId,
             code: source.INID_Product_Price_Book__r.INID_Material_Code__c,
             description: source.INID_Product_Price_Book__r.INID_SKU_Description__c,
             unitPrice,
@@ -449,8 +430,10 @@ export default class InidAddProduct extends LightningElement {
             salePrice: unitPrice,
             unit: source.INID_Product_Price_Book__r.INID_Unit__c || '',
             total: unitPrice * quantity,
+            editableSalePrice,
         };
     }
+
 
     showProductCode() {
         this.isShowAddfromText = !this.isShowAddfromText;
@@ -502,6 +485,14 @@ export default class InidAddProduct extends LightningElement {
                 } else {
                     const unitPrice = match.INID_Product_Price_Book__r.INID_Unit_Price__c || 0;
                     const quantity = 1;
+                    let editableSalePrice = false;
+
+                    if (this.allBU === "true") {
+                        editableSalePrice = true;
+                    } else if (this.productBuIds && this.productBuIds.has(productPriceBookId)) {
+                        editableSalePrice = true;
+                    }
+
                     added.push({
                         rowKey: productId,
                         id: productId,
@@ -513,7 +504,7 @@ export default class InidAddProduct extends LightningElement {
                         unit: match.INID_Product_Price_Book__r.INID_Unit__c,
                         unitPrice,
                         total: unitPrice * quantity,
-                        editableSalePrice: true
+                        editableSalePrice
                     });
                 }
             }
