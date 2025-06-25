@@ -17,6 +17,7 @@ import fetchUserGroup from '@salesforce/apex/INID_OrderController.fetchUserGroup
 import fetchBuGroupId from '@salesforce/apex/INID_OrderController.fetchBuGroupId' ;
 import fetchProductsByBuGroups from '@salesforce/apex/INID_OrderController.fetchProductsByBuGroups' ;
 import fetchProductLicenseExclude from '@salesforce/apex/INID_OrderController.fetchProductLicenseExclude' ;
+import fetchAverage from '@salesforce/apex/INID_OrderController.fetchAverage' ;
 import { refreshApex } from '@salesforce/apex';
 import USER_ID from '@salesforce/user/Id';
 
@@ -60,6 +61,7 @@ export default class InidAddProduct extends LightningElement {
     @track quoteId ;
     @track classifyLicenseId ;
     @track allBU ;
+    @track productAverage ;
     
 
     columns = [
@@ -199,6 +201,16 @@ export default class InidAddProduct extends LightningElement {
 
         } else if (error) {
             console.error('Error fetching classify type:', error);
+        }
+    }
+
+    @wire(fetchAverage, {accountId: '$accountId'})
+    wiredAverge({ error, data }) {
+        if (data) {
+            this.productAverage = data;
+            console.log('productAverage: ' + JSON.stringify(this.productAverage, null, 2) );
+        } else if (error) {
+            console.error('Error fetching accounts:', error);
         }
     }
 
@@ -411,6 +423,11 @@ export default class InidAddProduct extends LightningElement {
         const unitPrice = source.INID_Product_Price_Book__r.INID_Unit_Price__c || 0;
         const quantity = 1;
         const productPriceBookId = source.INID_Product_Price_Book__r.Id;
+        let salePrice = source.INID_Product_Price_Book__r.INID_Unit_Price__c || 0;
+        const matchedAverage = this.productAverage?.find(avg => avg.INID_Product_Price_Book__c === productPriceBookId);
+        if (matchedAverage) {
+            salePrice = matchedAverage.INID_Price__c;
+        }
 
         let editableSalePrice = false;
 
@@ -425,9 +442,9 @@ export default class InidAddProduct extends LightningElement {
             id: productPriceBookId,
             code: source.INID_Product_Price_Book__r.INID_Material_Code__c,
             description: source.INID_Product_Price_Book__r.INID_SKU_Description__c,
-            unitPrice,
+            unitPrice: salePrice,
             quantity,
-            salePrice: unitPrice,
+            salePrice: salePrice,
             unit: source.INID_Product_Price_Book__r.INID_Unit__c || '',
             total: unitPrice * quantity,
             editableSalePrice,
@@ -493,17 +510,29 @@ export default class InidAddProduct extends LightningElement {
                         editableSalePrice = true;
                     }
 
+                    const productPriceBookId = match.INID_Product_Price_Book__r.Id;
+
+                    // let salePrice = unitPrice;
+
+                    // ✅ เช็คราคาเฉลี่ย ถ้ามีใน productAverage
+                    let salePrice = match.INID_Product_Price_Book__r.INID_Unit_Price__c || 0;
+                    const matchedAverage = this.productAverage?.find(avg => avg.INID_Product_Price_Book__c === productPriceBookId);
+                    console.log('match average  : ' + JSON.stringify(this.productAverage));
+                    if (matchedAverage) {
+                        salePrice = matchedAverage.INID_Price__c;
+                    }
+
                     added.push({
-                        rowKey: productId,
-                        id: productId,
+                        rowKey: productPriceBookId,
+                        id: productPriceBookId,
                         code: match.INID_Product_Price_Book__r.INID_Material_Code__c,
                         Name: match.INID_Product_Price_Book__r.Name,
                         description: match.INID_Product_Price_Book__r.INID_SKU_Description__c,
                         quantity,
-                        salePrice: unitPrice,
+                        unitPrice: salePrice ,
+                        salePrice,
                         unit: match.INID_Product_Price_Book__r.INID_Unit__c,
-                        unitPrice,
-                        total: unitPrice * quantity,
+                        total: salePrice * quantity,
                         editableSalePrice
                     });
                 }
