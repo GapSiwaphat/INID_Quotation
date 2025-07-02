@@ -69,7 +69,15 @@ export default class InidAddProduct extends LightningElement {
         { label: 'SKU Description', fieldName: 'description', type: 'text', hideDefaultActions: true, cellAttributes: { alignment: 'right' }, initialWidth: 267.5 },
         { label: 'Unit Price', fieldName: 'unitPrice', type: 'currency', typeAttributes: { minimumFractionDigits: 2 }, hideDefaultActions: true, cellAttributes: { alignment: 'right' }, initialWidth: 150 },
         { label: 'Quantity', fieldName: 'quantity', type: 'text', editable: true, hideDefaultActions: true, cellAttributes: { alignment: 'right' }, initialWidth: 100 },
-        { label: 'Sale Price', fieldName: 'salePrice', type: 'currency',  editable: {fieldName : 'editableSalePrice'} , typeAttributes: { minimumFractionDigits: 2 }, hideDefaultActions: true, cellAttributes: { alignment: 'right' }},
+        {
+            label: 'Sale Price',
+            fieldName: 'salePrice',
+            type: 'currency',
+            editable: { fieldName: 'editableSalePrice' },
+            typeAttributes: { minimumFractionDigits: 2 },
+            hideDefaultActions: true,
+            cellAttributes: { alignment: 'right' }
+        },
         { label: 'Unit', fieldName: 'unit', type: 'text', hideDefaultActions: true, cellAttributes: { alignment: 'right' }, initialWidth: 100 },
         { label: 'Total', fieldName: 'total', type: 'currency', typeAttributes: { minimumFractionDigits: 2 }, hideDefaultActions: true, cellAttributes: { alignment: 'right' }, initialWidth: 140 },
     ];
@@ -110,11 +118,15 @@ export default class InidAddProduct extends LightningElement {
         if (data) {
             this.buGroupData = data;
             this.buGroupId = this.buGroupData.map(r => r.INID_BU_Group__c);
-            this.allBU = this.buGroupData.map(r => r.INID_All_BU__c).join(', ');
-            console.log('BU Gruop : ' + JSON.stringify(this.buGroupId, null, 2) );
-            console.log('All BU Gruop : ' + JSON.stringify(this.allBU, null, 2) );
+            const allBUValues = this.buGroupData.map(r => r.INID_All_BU__c);
+            this.allBU = allBUValues.includes(true) || allBUValues.includes("true");
+
+            console.log('BU Group Ids : ' + JSON.stringify(this.buGroupId, null, 2));
+            console.log('All BU : ' + this.allBU);
+            this.updateEditableSalePrice();
+
         } else if (error) {
-            console.error('Error fetching accounts:', error);
+            console.error('Error fetching buGroupId:', error);
         }
     }
 
@@ -123,13 +135,15 @@ export default class InidAddProduct extends LightningElement {
         if (data) {
             this.productsByBuGroups = data;
             this.productBuGroupId = this.productsByBuGroups.map(r => r.INID_Product_Price_Book__c);
-            this.productBuIds = new Set(this.productBuGroupId); 
-            console.log('product price book by BU Group : ' + JSON.stringify(this.productBuGroupId, null, 2) );
+            this.productBuIds = new Set(this.productBuGroupId);
+            console.log('Product Price Book by BU Group : ' + JSON.stringify(this.productBuGroupId, null, 2));
+            this.updateEditableSalePrice();
+
         } else if (error) {
-            console.error('Error fetching accounts:', error);
+            console.error('Error fetching productsByBuGroups:', error);
         }
     }
-
+    
     // Apex wire: get record id
     @wire(getRecordId, { quoteId: '$recordId' })
     wireGetRecordId({ error, data }) {
@@ -213,6 +227,25 @@ export default class InidAddProduct extends LightningElement {
             console.error('Error fetching accounts:', error);
         }
     }
+
+    updateEditableSalePrice() {
+        if (!this.selectedProducts || this.selectedProducts.length === 0) return;
+
+        this.selectedProducts = this.selectedProducts.map(p => {
+            const productPriceBookId = p.id;
+            let editableSalePrice = false;
+
+            if (this.allBU === true || this.allBU === "true") {
+                editableSalePrice = true;
+            } else if (this.productBuIds && this.productBuIds.has(productPriceBookId)) {
+                editableSalePrice = true;
+            }
+
+            return { ...p, editableSalePrice };
+        });
+        console.log('Updated selectedProducts with editableSalePrice:', JSON.stringify(this.selectedProducts, null, 2));
+    }
+
 
     processSummaryClassify() {
         this.summaryClassify = [];
@@ -355,7 +388,9 @@ export default class InidAddProduct extends LightningElement {
         if(data) {
             this.quoteOrderItemValue = data ;
             this.selectedProducts = this.quoteOrderItemValue.map((productItem) => {
-                
+                const productPriceBookId = productItem.INID_Product_Price_Book__r.Id;
+                console.log('product BUID : ' + JSON.stringify(this.productBuIds , null ,2));
+
                 let editableSalePrice = false;
                 if (this.allBU === "true") {
                     editableSalePrice = true;
@@ -369,7 +404,7 @@ export default class InidAddProduct extends LightningElement {
                     id: productItem.INID_Product_Price_Book__r.Id,
                     code: productItem.INID_Material_Code__c ,
                     description: productItem.INID_SKU_Description__c ,
-                    unitPrice: productItem.INID_Product_Price_Book__r.INID_Unit_Price__c ,
+                    unitPrice: productItem.INID_Product_Price_Book__r.INID_Unit_Price__c || 0,
                     quantity: productItem.INID_Quantity__c ,
                     salePrice: productItem.INID_Sale_Price__c ,
                     unit: productItem.INID_Product_Price_Book__r.INID_Unit__c ,
