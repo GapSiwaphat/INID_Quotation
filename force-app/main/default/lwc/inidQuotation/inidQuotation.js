@@ -534,7 +534,9 @@ export default class InidAddProduct extends LightningElement {
             } else {
                 const productId = match.INID_Product_Price_Book__r.Id;
                 const isExcluded = this.productLicenseExclude.includes(productId);
-                const alreadyExists = this.selectedProducts.some(p => p.code === code);
+                const alreadyExists = this.selectedProducts.some(p =>
+                    p.name === code
+                );
 
                 if (isExcluded) {
                     excluded.push(code);
@@ -566,7 +568,7 @@ export default class InidAddProduct extends LightningElement {
                     added.push({
                         rowKey: productPriceBookId,
                         id: productPriceBookId,
-                        code: match.INID_Product_Price_Book__r.INID_Material_Code__c,
+                        // code: match.INID_Product_Price_Book__r.INID_Material_Code__c,
                         name: match.INID_Product_Price_Book__r.Name,
                         description: match.INID_Product_Price_Book__r.INID_SKU_Description__c,
                         quantity,
@@ -603,7 +605,7 @@ export default class InidAddProduct extends LightningElement {
 
     get hasSelectedProducts() {
         return this.selectedProducts && this.selectedProducts.length > 0;
-    }
+    }   
 
     // Save edited rows
     handleSaveEditedRows(event) {
