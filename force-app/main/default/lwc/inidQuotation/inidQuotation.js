@@ -65,7 +65,7 @@ export default class InidAddProduct extends LightningElement {
     
 
     columns = [
-        { label: 'Name', fieldName: 'name', type: 'text', hideDefaultActions: true, cellAttributes: { alignment: 'right' }, initialWidth: 120 },
+        { label: 'Material Code', fieldName: 'code', type: 'text', hideDefaultActions: true, cellAttributes: { alignment: 'right' }, initialWidth: 120 },
         { label: 'SKU Description', fieldName: 'description', type: 'text', hideDefaultActions: true, cellAttributes: { alignment: 'right' }, initialWidth: 267.5 },
         { label: 'Unit Price', fieldName: 'unitPrice', type: 'currency', typeAttributes: { minimumFractionDigits: 2 }, hideDefaultActions: true, cellAttributes: { alignment: 'right' }, initialWidth: 150 },
         { label: 'Quantity', fieldName: 'quantity', type: 'text', editable: true, hideDefaultActions: true, cellAttributes: { alignment: 'right' }, initialWidth: 100 },
@@ -404,6 +404,7 @@ export default class InidAddProduct extends LightningElement {
                     rowKey: productItem.Id,
                     recordId: productItem.Id,
                     id: productItem.INID_Product_Price_Book__r.Id,
+                    code: productItem.INID_Product_Price_Book__r.INID_Material_Code__c,
                     name: productItem.INID_Product_Price_Book__r.Name,
                     description: productItem.INID_SKU_Description__c ,
                     unitPrice: productItem.INID_Product_Price_Book__r.INID_Unit_Price__c || 0,
@@ -428,10 +429,11 @@ export default class InidAddProduct extends LightningElement {
         this.filteredProductOptions = this.productPriceBook.filter(product => {
             const productId = product.INID_Product_Price_Book__r.Id;
             const description = (product.INID_Product_Price_Book__r.INID_SKU_Description__c || '').toLowerCase();
+            const code = (product.INID_Product_Price_Book__r.INID_Material_Code__c || '').toLowerCase();
             const name = (product.INID_Product_Price_Book__r.Name || '').toLowerCase();
             const isExcluded = this.productLicenseExclude.includes(productId);
 
-            return !isExcluded && (description.includes(term) || name.includes(term));
+            return !isExcluded && (description.includes(term) || code.includes(term));
         });
     }
 
@@ -526,7 +528,7 @@ export default class InidAddProduct extends LightningElement {
             console.log('product price book add product to table:' + JSON.stringify(this.productPriceBook , null ,2));
             console.log('eneter product code :' + JSON.stringify(this.enteredProductCodes , null ,2)) ;
             const match = this.productPriceBook.find(p => 
-                p.INID_Product_Price_Book__r.Name === code
+                p.INID_Product_Price_Book__r.INID_Material_Code__c === code
             );
             console.log('match Product ? : ' + JSON.stringify(match , null , 2));
             if (!match) {
@@ -535,7 +537,7 @@ export default class InidAddProduct extends LightningElement {
                 const productId = match.INID_Product_Price_Book__r.Id;
                 const isExcluded = this.productLicenseExclude.includes(productId);
                 const alreadyExists = this.selectedProducts.some(p =>
-                    p.name === code
+                    p.code === code
                 );
 
                 if (isExcluded) {
@@ -557,7 +559,7 @@ export default class InidAddProduct extends LightningElement {
 
                     // let salePrice = unitPrice;
 
-                    // ✅ เช็คราคาเฉลี่ย ถ้ามีใน productAverage
+
                     let salePrice = match.INID_Product_Price_Book__r.INID_Unit_Price__c || 0;
                     const matchedAverage = this.productAverage?.find(avg => avg.INID_Product_Price_Book__c === productPriceBookId);
                     console.log('match average  : ' + JSON.stringify(this.productAverage));
@@ -568,7 +570,7 @@ export default class InidAddProduct extends LightningElement {
                     added.push({
                         rowKey: productPriceBookId,
                         id: productPriceBookId,
-                        // code: match.INID_Product_Price_Book__r.INID_Material_Code__c,
+                        code: match.INID_Product_Price_Book__r.INID_Material_Code__c,
                         name: match.INID_Product_Price_Book__r.Name,
                         description: match.INID_Product_Price_Book__r.INID_SKU_Description__c,
                         quantity,
